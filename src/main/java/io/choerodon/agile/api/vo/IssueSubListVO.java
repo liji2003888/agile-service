@@ -1,7 +1,9 @@
 package io.choerodon.agile.api.vo;
 
+
 import io.choerodon.agile.infra.utils.StringUtil;
 import io.swagger.annotations.ApiModelProperty;
+import org.hzero.starter.keyencrypt.core.Encrypt;
 
 /**
  * @author dinghuang123@gmail.com
@@ -10,12 +12,14 @@ import io.swagger.annotations.ApiModelProperty;
 public class IssueSubListVO {
 
     @ApiModelProperty(value = "问题主键id")
+    @Encrypt
     private Long issueId;
 
     @ApiModelProperty(value = "问题编号")
     private String issueNum;
 
     @ApiModelProperty(value = "状态id")
+    @Encrypt
     private Long statusId;
 
     @ApiModelProperty(value = "经办人id")
@@ -43,6 +47,7 @@ public class IssueSubListVO {
     private String imageUrl;
 
     @ApiModelProperty(value = "问题类型id")
+    @Encrypt
     private Long issueTypeId;
 
     @ApiModelProperty(value = "优先级id")
@@ -62,6 +67,9 @@ public class IssueSubListVO {
 
     @ApiModelProperty(value = "版本号")
     private Long objectVersionNumber;
+
+    @ApiModelProperty(value = "创建人")
+    private Long createdBy;
 
     public Long getIssueId() {
         return issueId;
@@ -207,6 +215,14 @@ public class IssueSubListVO {
 
     public void setObjectVersionNumber(Long objectVersionNumber) {
         this.objectVersionNumber = objectVersionNumber;
+    }
+
+    public Long getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(Long createdBy) {
+        this.createdBy = createdBy;
     }
 
     @Override

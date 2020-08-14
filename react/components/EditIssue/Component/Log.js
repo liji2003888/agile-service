@@ -1,12 +1,13 @@
 import React, { Component } from 'react';
 import { Icon, Popconfirm } from 'choerodon-ui';
+import {
+  text2Delta, beforeTextUpload,
+} from '@/utils/richText';
+import { workLogApi } from '@/api';
 import UserHead from '../../UserHead';
 import WYSIWYGEditor from '../../WYSIWYGEditor';
-import { IssueDescription, DatetimeAgo } from '../../CommonComponent';
-import {
-  delta2Html, text2Delta, beforeTextUpload,
-} from '../../../common/utils';
-import { deleteWorklog, updateWorklog } from '../../../api/NewIssueApi';
+import WYSIWYGViewer from '../../WYSIWYGViewer';
+import { DatetimeAgo } from '../../CommonComponent';
 import './Log.less';
 
 
@@ -22,7 +23,7 @@ class Log extends Component {
 
   updateLog = (log) => {
     const { onUpdateLog } = this.props;
-    updateWorklog(log.logId, log).then((res) => {
+    workLogApi.update(log.logId, log).then((res) => {
       this.setState({
         editLogId: undefined,
         editLog: undefined,
@@ -33,7 +34,7 @@ class Log extends Component {
 
   handleDeleteLog(logId) {
     const { onDeleteLog } = this.props;
-    deleteWorklog(logId)
+    workLogApi.delete(logId)
       .then((res) => {
         onDeleteLog();
       });
@@ -177,7 +178,7 @@ class Log extends Component {
                 <span style={{ flex: 1 }}>
                   {
                     worklog.logId !== editLogId ? (
-                      <IssueDescription data={delta2Html(worklog.description)} />
+                      <WYSIWYGViewer data={worklog.description} />
                     ) : null
                   }
                 </span>

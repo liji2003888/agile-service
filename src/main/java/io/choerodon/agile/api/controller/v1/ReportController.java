@@ -3,19 +3,22 @@ package io.choerodon.agile.api.controller.v1;
 import com.alibaba.fastjson.JSONObject;
 import io.choerodon.agile.api.vo.*;
 import io.choerodon.agile.app.service.ReportService;
+
 import io.choerodon.agile.infra.dto.GroupDataChartDTO;
 import io.choerodon.agile.infra.dto.GroupDataChartListDTO;
-import io.choerodon.core.annotation.Permission;
-import io.choerodon.core.enums.ResourceType;
-import com.github.pagehelper.PageInfo;
+import io.choerodon.agile.infra.utils.EncryptionUtils;
+import io.choerodon.core.domain.Page;
+import io.choerodon.core.iam.ResourceLevel;
+import io.choerodon.mybatis.pagehelper.domain.Sort;
+import io.choerodon.swagger.annotation.Permission;
 import io.choerodon.core.exception.CommonException;
-import io.choerodon.core.iam.InitRoleCode;
-import org.springframework.data.web.SortDefault;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import io.choerodon.mybatis.pagehelper.annotation.SortDefault;
+import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 import io.choerodon.swagger.annotation.CustomPageRequest;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import org.hzero.starter.keyencrypt.core.Encrypt;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -42,13 +45,13 @@ public class ReportController {
     private static final String QUERY_ISSUE_ERROR = "error.issue.query";
     private static final String VERSION_LINE_CHART_ERROR = "error.version.lineChart";
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("查询冲刺对应的燃尽图报告信息")
     @GetMapping(value = "/{sprintId}/burn_down_report")
     public ResponseEntity<List<ReportIssueVO>> queryBurnDownReport(@ApiParam(value = "项目id", required = true)
                                                                     @PathVariable(name = "project_id") Long projectId,
                                                                    @ApiParam(value = "sprintId", required = true)
-                                                                    @PathVariable Long sprintId,
+                                                                    @PathVariable @Encrypt Long sprintId,
                                                                    @ApiParam(value = "类型(storyPoints、remainingEstimatedTime、issueCount)", required = true)
                                                                     @RequestParam String type,
                                                                    @ApiParam(value = "排序方式(asc,desc)", required = true)
@@ -58,13 +61,13 @@ public class ReportController {
                 .orElseThrow(() -> new CommonException("error.report.queryBurnDownReport"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("查询燃尽图坐标信息")
     @GetMapping(value = "/{sprintId}/burn_down_report/coordinate")
     public ResponseEntity<JSONObject> queryBurnDownCoordinate(@ApiParam(value = "项目id", required = true)
                                                               @PathVariable(name = "project_id") Long projectId,
                                                               @ApiParam(value = "sprintId", required = true)
-                                                              @PathVariable Long sprintId,
+                                                              @PathVariable @Encrypt Long sprintId,
                                                               @ApiParam(value = "类型(storyPoints、remainingEstimatedTime、issueCount)", required = true)
                                                               @RequestParam String type) {
         return Optional.ofNullable(reportService.queryBurnDownCoordinate(projectId, sprintId, type))
@@ -72,7 +75,7 @@ public class ReportController {
                 .orElseThrow(() -> new CommonException("error.report.queryBurnDownCoordinate"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("查看项目累积流量图")
     @PostMapping(value = "/cumulative_flow_diagram")
     public ResponseEntity<List<CumulativeFlowDiagramVO>> queryCumulativeFlowDiagram(@ApiParam(value = "项目id", required = true)
@@ -84,35 +87,35 @@ public class ReportController {
                 .orElseThrow(() -> new CommonException("error.report.queryCumulativeFlowDiagram"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @CustomPageRequest
     @ApiOperation(value = "根据状态查版本下issue列表")
     @GetMapping(value = "/{versionId}/issues")
-    public ResponseEntity<PageInfo<IssueListVO>> queryIssueByOptions(@ApiParam(value = "项目id", required = true)
+    public ResponseEntity<Page<IssueListVO>> queryIssueByOptions(@ApiParam(value = "项目id", required = true)
                                                                   @PathVariable(name = "project_id") Long projectId,
-                                                                     @ApiParam(value = "版本id", required = true)
-                                                                  @PathVariable Long versionId,
-                                                                     @ApiParam(value = "状态", required = true)
+                                                                 @ApiParam(value = "版本id", required = true)
+                                                                  @PathVariable @Encrypt Long versionId,
+                                                                 @ApiParam(value = "状态", required = true)
                                                                   @RequestParam String status,
-                                                                     @ApiParam(value = "组织id", required = true)
+                                                                 @ApiParam(value = "组织id", required = true)
                                                                   @RequestParam Long organizationId,
-                                                                     @ApiParam(value = "类型", required = true)
+                                                                 @ApiParam(value = "类型", required = true)
                                                                   @RequestParam String type,
-                                                                     @ApiParam(value = "分页信息", required = true)
+                                                                 @ApiParam(value = "分页信息", required = true)
                                                                   @SortDefault(value = "issue_id", direction = Sort.Direction.DESC)
-                                                                  @ApiIgnore Pageable pageable) {
-        return Optional.ofNullable(reportService.queryIssueByOptions(projectId, versionId, status, type, pageable, organizationId))
+                                                                  @ApiIgnore PageRequest pageRequest) {
+        return Optional.ofNullable(reportService.queryIssueByOptions(projectId, versionId, status, type, pageRequest, organizationId))
                 .map(result -> new ResponseEntity<>(result, HttpStatus.OK))
                 .orElseThrow(() -> new CommonException(QUERY_ISSUE_ERROR));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation(value = "版本报告图信息")
     @GetMapping(value = "/{versionId}")
     public ResponseEntity<Map<String, Object>> queryVersionLineChart(@ApiParam(value = "项目id", required = true)
                                                                      @PathVariable(name = "project_id") Long projectId,
                                                                      @ApiParam(value = "版本id", required = true)
-                                                                     @PathVariable Long versionId,
+                                                                     @PathVariable @Encrypt Long versionId,
                                                                      @ApiParam(value = "统计类型", required = true)
                                                                      @RequestParam String type) {
         return Optional.ofNullable(reportService.queryVersionLineChart(projectId, versionId, type))
@@ -120,7 +123,7 @@ public class ReportController {
                 .orElseThrow(() -> new CommonException(VERSION_LINE_CHART_ERROR));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation(value = "速度图")
     @GetMapping(value = "/velocity_chart")
     public ResponseEntity<List<VelocitySprintVO>> queryVelocityChart(@ApiParam(value = "项目id", required = true)
@@ -132,7 +135,7 @@ public class ReportController {
                 .orElseThrow(() -> new CommonException("error.velocityChart.get"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("查询饼图")
     @GetMapping(value = "/pie_chart")
     public ResponseEntity<List<PieChartVO>> queryPieChart(@ApiParam(value = "项目id", required = true)
@@ -147,21 +150,21 @@ public class ReportController {
                                                           @ApiParam(value = "结束时间 yyyy-MM-dd HH:mm:ss")
                                                            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date endDate,
                                                           @ApiParam(value = "冲刺id")
-                                                           @RequestParam(required = false) Long sprintId,
+                                                           @RequestParam(required = false) @Encrypt Long sprintId,
                                                           @ApiParam(value = "版本id")
-                                                           @RequestParam(required = false) Long versionId) {
+                                                           @RequestParam(required = false) @Encrypt Long versionId) {
         return Optional.ofNullable(reportService.queryPieChart(projectId, fieldName, organizationId, startDate, endDate, sprintId, versionId))
                 .map(result -> new ResponseEntity<>(result, HttpStatus.OK))
                 .orElseThrow(() -> new CommonException("error.report.queryPieChart"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation(value = "史诗图")
     @GetMapping(value = "/epic_chart")
     public ResponseEntity<List<GroupDataChartDTO>> queryEpicChart(@ApiParam(value = "项目id", required = true)
                                                                  @PathVariable(name = "project_id") Long projectId,
                                                                   @ApiParam(value = "epic id", required = true)
-                                                                 @RequestParam Long epicId,
+                                                                 @RequestParam @Encrypt Long epicId,
                                                                   @ApiParam(value = "统计类型", required = true)
                                                                  @RequestParam String type) {
         return Optional.ofNullable(reportService.queryEpicChart(projectId, epicId, type))
@@ -169,13 +172,13 @@ public class ReportController {
                 .orElseThrow(() -> new CommonException("error.epicChart.get"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation(value = "史诗图问题列表")
     @GetMapping(value = "/epic_issue_list")
     public ResponseEntity<List<GroupDataChartListDTO>> queryEpicChartList(@ApiParam(value = "项目id", required = true)
                                                                          @PathVariable(name = "project_id") Long projectId,
                                                                           @ApiParam(value = "epic id", required = true)
-                                                                         @RequestParam Long epicId,
+                                                                         @RequestParam @Encrypt Long epicId,
                                                                           @ApiParam(value = "组织id", required = true)
                                                                          @RequestParam Long organizationId) {
         return Optional.ofNullable(reportService.queryEpicChartList(projectId, epicId, organizationId))
@@ -183,13 +186,13 @@ public class ReportController {
                 .orElseThrow(() -> new CommonException("error.epicChartList.get"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation(value = "版本图重构api")
     @GetMapping(value = "/version_chart")
     public ResponseEntity<List<GroupDataChartDTO>> queryVersionChart(@ApiParam(value = "项目id", required = true)
                                                                     @PathVariable(name = "project_id") Long projectId,
                                                                      @ApiParam(value = "version id", required = true)
-                                                                    @RequestParam Long versionId,
+                                                                    @RequestParam @Encrypt Long versionId,
                                                                      @ApiParam(value = "统计类型", required = true)
                                                                     @RequestParam String type) {
         return Optional.ofNullable(reportService.queryVersionChart(projectId, versionId, type))
@@ -197,13 +200,13 @@ public class ReportController {
                 .orElseThrow(() -> new CommonException("error.versionChart.get"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation(value = "版本图问题列表重构api")
     @GetMapping(value = "/version_issue_list")
     public ResponseEntity<List<GroupDataChartListDTO>> queryVersionChartList(@ApiParam(value = "项目id", required = true)
                                                                             @PathVariable(name = "project_id") Long projectId,
                                                                              @ApiParam(value = "version id", required = true)
-                                                                            @RequestParam Long versionId,
+                                                                            @RequestParam @Encrypt Long versionId,
                                                                              @ApiParam(value = "组织id", required = true)
                                                                             @RequestParam Long organizationId) {
         return Optional.ofNullable(reportService.queryVersionChartList(projectId, versionId, organizationId))
@@ -211,13 +214,13 @@ public class ReportController {
                 .orElseThrow(() -> new CommonException("error.versionChartList.get"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("Epic和版本燃耗图坐标信息")
     @GetMapping(value = "/burn_down_coordinate_type/{id}")
     public ResponseEntity<List<BurnDownReportCoordinateVO>> queryBurnDownCoordinateByType(@ApiParam(value = "项目id", required = true)
                                                                                            @PathVariable(name = "project_id") Long projectId,
                                                                                           @ApiParam(value = "id", required = true)
-                                                                                           @PathVariable Long id,
+                                                                                           @PathVariable @Encrypt Long id,
                                                                                           @ApiParam(value = "类型:Epic/Version", required = true)
                                                                                            @RequestParam String type) {
         return Optional.ofNullable(reportService.queryBurnDownCoordinateByType(projectId, id, type))
@@ -225,13 +228,13 @@ public class ReportController {
                 .orElseThrow(() -> new CommonException("error.report.queryBurnDownCoordinateByType"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("Epic和版本燃耗图报告信息")
     @GetMapping(value = "/burn_down_report_type/{id}")
     public ResponseEntity<BurnDownReportVO> queryBurnDownReportByType(@ApiParam(value = "项目id", required = true)
                                                                        @PathVariable(name = "project_id") Long projectId,
                                                                       @ApiParam(value = "id", required = true)
-                                                                       @PathVariable Long id,
+                                                                       @PathVariable @Encrypt Long id,
                                                                       @ApiParam(value = "类型:Epic/Version", required = true)
                                                                        @RequestParam String type,
                                                                       @ApiParam(value = "组织id", required = true)
@@ -241,7 +244,7 @@ public class ReportController {
                 .orElseThrow(() -> new CommonException("error.report.queryBurnDownReportByType"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("问题类型分布图")
     @GetMapping(value = "/issue_type_distribution_chart")
     public ResponseEntity<List<IssueTypeDistributionChartVO>> queryIssueTypeDistributionChart(@ApiParam(value = "项目id", required = true)
@@ -251,7 +254,7 @@ public class ReportController {
                 .orElseThrow(() -> new CommonException("error.report.queryIssueTypeDistributionChart"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("版本进度图，排序前5个版本")
     @GetMapping(value = "/version_progress_chart")
     public ResponseEntity<List<IssueTypeDistributionChartVO>> queryVersionProgressChart(@ApiParam(value = "项目id", required = true)
@@ -261,7 +264,7 @@ public class ReportController {
                 .orElseThrow(() -> new CommonException("error.report.queryVersionProgressChart"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("问题优先级分布图")
     @GetMapping(value = "/issue_priority_distribution_chart")
     public ResponseEntity<List<IssuePriorityDistributionChartVO>> queryIssuePriorityDistributionChart(@ApiParam(value = "项目id", required = true)

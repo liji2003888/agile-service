@@ -1,10 +1,8 @@
 import React, { Component } from 'react';
 import { find, debounce } from 'lodash';
 import { Select, Form, Modal } from 'choerodon-ui';
-import {
-  updateIssue, loadIssueTypes, loadIssues, loadIssue,
-} from '../../api/NewIssueApi';
-import TypeTag from '../TypeTag';
+import { issueApi, issueTypeApi } from '@/api';
+
 import IssueOption from '../IssueOption';
 import './RelateStory.less';
 
@@ -15,6 +13,13 @@ let sign = false;
 
 class RelateStory extends Component {
   debounceFilterIssues = debounce((input) => {
+    this.setState({
+      filters: {
+        advancedSearchArgs: {
+          summary: input,
+        },
+      },
+    });
     this.loadIssues();
   }, 500);
 
@@ -24,6 +29,7 @@ class RelateStory extends Component {
       createLoading: false,
       selectLoading: true,
       storys: [],
+      filters: {},
     };
   }
 
@@ -55,7 +61,8 @@ class RelateStory extends Component {
       this.setState({
         selectLoading: true,
       });
-      loadIssues(1, 10, this.filters)
+      const { filters } = this.state;
+      issueApi.loadStroyAndTask(1, 20, filters)
         .then((res) => {
           const storys = res.list;
           if (storys) {
@@ -63,7 +70,7 @@ class RelateStory extends Component {
             if (issue.relateIssueId) {
               if (!find(storys, { issueId: issue.relateIssueId })) {
                 if (!this.relateIssue) {
-                  loadIssue(issue.relateIssueId).then((story) => {
+                  issueApi.load(issue.relateIssueId).then((story) => {
                     if (story) {
                       this.relateIssue = story;
                       this.setState({
@@ -102,7 +109,7 @@ class RelateStory extends Component {
         const { relateIssueId } = values;
         this.setState({ createLoading: true });
         const { issueId, objectVersionNumber } = issue;
-        updateIssue({
+        issueApi.update({
           issueId,
           objectVersionNumber,
           relateIssueId: relateIssueId || 0,
@@ -119,7 +126,7 @@ class RelateStory extends Component {
     this.setState({
       selectLoading: true,
     });
-    loadIssueTypes().then((issueTypes) => {
+    issueTypeApi.loadAllWithStateMachineId().then((issueTypes) => {
       const types = issueTypes.filter(type => type.typeCode === 'story' || type.typeCode === 'task');
       if (types) {
         this.types = types;

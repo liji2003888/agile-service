@@ -4,10 +4,10 @@ import {
   Page, Header, Content, stores, Permission, Breadcrumb,
 } from '@choerodon/boot';
 import {
-  Button, Menu, Icon, Breadcrumb as Bread, Spin, Tooltip,
+  Button, Menu, Icon, Spin, Tooltip,
 } from 'choerodon-ui';
-import { Action, axios } from '@choerodon/boot';
-import { withRouter, Link } from 'react-router-dom';
+import { withRouter } from 'react-router-dom';
+import { versionApi } from '@/api';
 import DragSortingTable from '../ReleaseComponent/DragSortingTable';
 import AddRelease from '../ReleaseComponent/AddRelease';
 import ReleaseStore from '../../../stores/project/release/ReleaseStore';
@@ -18,7 +18,6 @@ import TableDropMenu from '../../../common/TableDropMenu';
 import DeleteReleaseWithIssues from '../ReleaseComponent/DeleteReleaseWithIssues';
 
 const { AppState } = stores;
-const { Item } = Bread;
 const COLOR_MAP = {
   规划中: '#ffb100',
   已发布: '#00bfa5',
@@ -73,7 +72,7 @@ class ReleaseHome extends Component {
           total: data.total,
         },
       });
-    }).catch((error) => {
+    }).catch(() => {
     });
   }
 
@@ -81,24 +80,24 @@ class ReleaseHome extends Component {
     const { pagination } = this.state;
     if (key === '0') {
       if (record.statusCode === 'version_planning') {
-        ReleaseStore.axiosGetPublicVersionDetail(record.versionId)
+        versionApi.loadPublicVersionDetail(record.versionId)
           .then((res) => {
             ReleaseStore.setPublicVersionDetail(res);
             ReleaseStore.setVersionDetail(record);
             this.setState({ publicVersion: true, release: record });
-          }).catch((error) => {
+          }).catch(() => {
           });
       } else {
-        ReleaseStore.axiosUnPublicRelease(
+        versionApi.revokePublish(
           record.versionId,
         ).then((res2) => {
           this.refresh(pagination);
-        }).catch((error) => {
+        }).catch(() => {
         });
       }
     }
     if (key === '4') {
-      ReleaseStore.axiosVersionIssueStatistics(record.versionId).then((res) => {
+      versionApi.loadNamesAndIssueBeforeDel(record.versionId).then((res) => {
         this.setState({
           versionDelInfo: {
             versionName: record.name,
@@ -108,31 +107,31 @@ class ReleaseHome extends Component {
         }, () => {
           ReleaseStore.setDeleteReleaseVisible(true);
         });
-      }).catch((error) => {
+      }).catch(() => {
       });
     }
     if (key === '5') {
-      ReleaseStore.axiosGetVersionDetail(record.versionId).then((res) => {
+      versionApi.load(record.versionId).then((res) => {
         ReleaseStore.setVersionDetail(res);
         this.setState({
           selectItem: record,
           editRelease: true,
         });
-      }).catch((error) => {
+      }).catch(() => {
       });
     }
     if (key === '3') {
       if (record.statusCode === 'archived') {
         // 撤销归档
-        ReleaseStore.axiosUnFileVersion(record.versionId).then((res) => {
+        versionApi.revokeArchived(record.versionId).then((res) => {
           this.refresh(pagination);
-        }).catch((error) => {
+        }).catch(() => {
         });
       } else {
         // 归档
-        ReleaseStore.axiosFileVersion(record.versionId).then((res) => {
+        versionApi.archived(record.versionId).then((res) => {
           this.refresh(pagination);
-        }).catch((error) => {
+        }).catch(() => {
         });
       }
     }
@@ -162,7 +161,7 @@ class ReleaseHome extends Component {
   handleDrag = (res, postData) => {
     const { pagination } = this.state;
     ReleaseStore.setVersionList(res);
-    ReleaseStore.handleDataDrag(AppState.currentMenuType.id, postData)
+    versionApi.drag(postData)
       .then(() => {
         this.refresh(pagination);
       }).catch((error) => {
@@ -171,37 +170,44 @@ class ReleaseHome extends Component {
   };
 
   renderMenu = (text, record) => {
+    const { type, id, organizationId } = AppState.currentMenuType;
     const menu = (
       <Menu onClick={e => this.handleClickMenu(record, e.key)}>
         {record.statusCode === 'archived'
           ? null
           : (
-            <Menu.Item key="0">
-              <Tooltip placement="top" title={record.statusCode === 'version_planning' ? '发布' : '撤销发布'}>
-                <span>
-                  {record.statusCode === 'version_planning' ? '发布' : '撤销发布'}
-                </span>
-              </Tooltip>
-            </Menu.Item>
+            <Permission service={['choerodon.code.project.cooperation.work-list.ps.choerodon.code.cooperate.worklist.updateversionstatus']} key="0">
+              <Menu.Item key="0">
+                <Tooltip placement="top" title={record.statusCode === 'version_planning' ? '发布' : '撤销发布'}>
+                  <span>
+                    {record.statusCode === 'version_planning' ? '发布' : '撤销发布'}
+                  </span>
+                </Tooltip>
+              </Menu.Item>
+            </Permission>
           )
         }
-        <Menu.Item key="3">
-          <Tooltip placement="top" title={record.statusCode === 'archived' ? '撤销归档' : '归档'}>
-            <span>
-              {record.statusCode === 'archived' ? '撤销归档' : '归档'}
-            </span>
-          </Tooltip>
-        </Menu.Item>
+        <Permission service={['choerodon.code.project.cooperation.work-list.ps.choerodon.code.cooperate.worklist.updateversionstatus']} key="3">
+          <Menu.Item key="3">
+            <Tooltip placement="top" title={record.statusCode === 'archived' ? '撤销归档' : '归档'}>
+              <span>
+                {record.statusCode === 'archived' ? '撤销归档' : '归档'}
+              </span>
+            </Tooltip>
+          </Menu.Item>
+        </Permission>
         {record.statusCode === 'archived'
           ? null
           : (
-            <Menu.Item key="4">
-              <Tooltip placement="top" title="删除">
-                <span>
-                  删除
-                </span>
-              </Tooltip>
-            </Menu.Item>
+            <Permission service={['choerodon.code.project.cooperation.work-list.ps.choerodon.code.cooperate.worklist.deleteversion']} key="4">
+              <Menu.Item>
+                <Tooltip placement="top" title="删除">
+                  <span>
+                    删除
+                  </span>
+                </Tooltip>
+              </Menu.Item>
+            </Permission>
           )
         }
       </Menu>
@@ -211,6 +217,13 @@ class ReleaseHome extends Component {
         menu={menu}
         text={text}
         onClickEdit={this.handleClickMenu.bind(this, record, '5')}
+        type={type}
+        projectId={id}
+        organizationId={organizationId}
+        service={[
+          'choerodon.code.project.cooperation.work-list.ps.choerodon.code.cooperate.worklist.updateversionstatus',
+          'choerodon.code.project.cooperation.work-list.ps.choerodon.code.cooperate.worklist.deleteversion',
+        ]}
       />
     );
   };
@@ -227,10 +240,6 @@ class ReleaseHome extends Component {
       release,
     } = this.state;
     const deleteReleaseVisible = ReleaseStore.getDeleteReleaseVisible;
-    const menu = AppState.currentMenuType;
-    const {
-      type, id: projectId, organizationId: orgId, name, 
-    } = menu;
     const versionData = ReleaseStore.getVersionList.length > 0 ? ReleaseStore.getVersionList : [];
     const versionColumn = [{
       title: '版本',
@@ -309,21 +318,15 @@ class ReleaseHome extends Component {
     return (
       <Page
         service={[
-          'agile-service.product-version.releaseVersion',
-          'agile-service.product-version.revokeReleaseVersion',
-          'agile-service.product-version.revokeArchivedVersion',
-          'agile-service.product-version.archivedVersion',
-          'agile-service.product-version.deleteVersion',
-          'agile-service.product-version.updateVersion',
-          'agile-service.product-version.createVersion',
-          'agile-service.product-version.mergeVersion',
-          'agile-service.product-version.listByProjectId',
-          'agile-service.product-version.queryVersionByProjectId',
-          'base-service.organization-project.getGroupInfoByEnableProject',
+          'choerodon.code.project.cooperation.work-list.ps.version',
+          'choerodon.code.project.cooperation.work-list.ps.choerodon.code.cooperate.work-list.createversion',
+          'choerodon.code.project.cooperation.work-list.ps.choerodon.code.cooperate.worklist.deleteversion',
+          'choerodon.code.project.cooperation.work-list.ps.choerodon.code.cooperate.worklist.updateversionstatus',
+          'choerodon.code.project.cooperation.work-list.ps.choerodon.code.cooperate.worklist.updateversion',
         ]}
       >
-        <Header title="版本管理">
-          <Permission type={type} projectId={projectId} organizationId={orgId} service={['agile-service.product-version.createVersion']}>
+        <Permission service={['choerodon.code.project.cooperation.work-list.ps.choerodon.code.cooperate.work-list.createversion']}>
+          <Header title="版本管理">
             <Button
               onClick={() => {
                 this.setState({
@@ -336,8 +339,8 @@ class ReleaseHome extends Component {
               <Icon type="playlist_add" />
               创建发布版本
             </Button>
-          </Permission>
-        </Header>
+          </Header>
+        </Permission>
         <Breadcrumb />
         <Content style={{ paddingTop: 0 }}>
           <Spin spinning={loading}>

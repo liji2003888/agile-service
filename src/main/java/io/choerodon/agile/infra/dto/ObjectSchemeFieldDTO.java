@@ -1,17 +1,25 @@
 package io.choerodon.agile.infra.dto;
 
-import io.choerodon.mybatis.entity.BaseDTO;
+
+import io.choerodon.mybatis.annotation.ModifyAudit;
+import io.choerodon.mybatis.annotation.VersionAudit;
+import io.choerodon.mybatis.domain.AuditDomain;
+import org.hzero.starter.keyencrypt.core.Encrypt;
 
 import javax.persistence.*;
+import java.util.List;
 
 /**
  * @author shinan.chen
  * @since 2019/3/29
  */
 @Table(name = "fd_object_scheme_field")
-public class ObjectSchemeFieldDTO extends BaseDTO {
+@ModifyAudit
+@VersionAudit
+public class ObjectSchemeFieldDTO extends AuditDomain {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue
+    @Encrypt
     private Long id;
     private String code;
     private String name;
@@ -29,6 +37,46 @@ public class ObjectSchemeFieldDTO extends BaseDTO {
     private Long organizationId;
     @Transient
     private String fieldTypeName;
+    @Transient
+    private List<ObjectSchemeFieldExtendDTO> extendFields;
+    @Transient
+    private String createdLevel;
+    @Transient
+    private String rank;
+    @Transient
+    private List<PageFieldDTO> pages;
+
+    public List<PageFieldDTO> getPages() {
+        return pages;
+    }
+
+    public void setPages(List<PageFieldDTO> pages) {
+        this.pages = pages;
+    }
+
+    public String getRank() {
+        return rank;
+    }
+
+    public void setRank(String rank) {
+        this.rank = rank;
+    }
+
+    public String getCreatedLevel() {
+        return createdLevel;
+    }
+
+    public void setCreatedLevel(String createdLevel) {
+        this.createdLevel = createdLevel;
+    }
+
+    public List<ObjectSchemeFieldExtendDTO> getExtendFields() {
+        return extendFields;
+    }
+
+    public void setExtendFields(List<ObjectSchemeFieldExtendDTO> extendFields) {
+        this.extendFields = extendFields;
+    }
 
     public String getFieldTypeName() {
         return fieldTypeName;

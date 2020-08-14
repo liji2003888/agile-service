@@ -2,8 +2,10 @@ import React, { Component } from 'react';
 import { observer } from 'mobx-react';
 import classnames from 'classnames';
 import { Droppable } from 'react-beautiful-dnd';
-import ScrumBoardStore from '../../../../stores/project/scrumBoard/ScrumBoardStore';
+import ScrumBoardStore from '@/stores/project/scrumBoard/ScrumBoardStore';
 import StatusCouldDragOn from './StatusCouldDragOn';
+import Card from './Card';
+import { VIRTUAL_LIMIT } from './constant';
 
 @observer
 export default class StatusProvider extends Component {
@@ -11,6 +13,8 @@ export default class StatusProvider extends Component {
     completed, name: statusName, categoryCode, statusId,
   }) {
     const { children, keyId, columnId } = this.props;
+    const data = ScrumBoardStore.getSwimLaneData[keyId][statusId];
+    const mode = data.length > VIRTUAL_LIMIT ? 'virtual' : 'standard';
     return (
       <div
         key={statusId}
@@ -19,8 +23,26 @@ export default class StatusProvider extends Component {
         role="none"
       >
         <Droppable
+          mode={mode}
           droppableId={`${statusId}/${columnId}`}
           isDropDisabled={ScrumBoardStore.getCanDragOn.get(statusId)}
+          renderClone={(provided, snapshot, rubric) => {
+            const { index } = rubric.source;            
+            const issueObj = data[index];
+            return (
+              <Card
+                isDragging={snapshot.isDragging}
+                provided={provided}
+                key={issueObj.issueId}            
+                index={index}
+                issue={issueObj}
+                completed={completed}
+                statusName={statusName}
+                categoryCode={categoryCode}      
+                style={{ margin: 0 }}
+              />
+            );
+          }}
         >
           {(provided, snapshot) => (
             <React.Fragment>
@@ -41,11 +63,11 @@ export default class StatusProvider extends Component {
                 >
                   {statusName}
                 </span>
-                {children(keyId, statusId, completed, statusName, categoryCode)}
-                {provided.placeholder}
+                {children(keyId, statusId, completed, statusName, categoryCode, snapshot)}
+                {mode !== 'virtual' && provided.placeholder}
               </div>
             </React.Fragment>
-          )}
+          )}          
         </Droppable>
       </div>
     );

@@ -11,6 +11,7 @@
         <result property="width" column="width"/>
         <result property="height" column="height"/>
         <result property="type" column="type"/>
+        <result property="allStatusTransformId" column="all_status_transform_id"/>
         <result property="creationDate" column="creation_date"/>
         <result property="createdBy" column="created_by"/>
         <result property="lastUpdateDate" column="last_update_date"/>
@@ -141,5 +142,41 @@
         <foreach collection="stateMachineIds" item="id" open="(" separator="," close=")">
             #{id}
         </foreach>
+    </select>
+
+    <insert id="batchInsert" useGeneratedKeys="true" keyProperty="id">
+      insert into fd_state_machine_node(state_machine_id,status_id,type
+      ,all_status_transform_id,organization_id,created_by,last_updated_by)
+      values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.stateMachineId},#{item.statusId},#{item.type}
+            ,#{item.allStatusTransformId},#{item.organizationId},#{item.createdBy},#{item.lastUpdatedBy})
+        </foreach>
+    </insert>
+
+    <select id="countIssueTypeByStatusIds" resultType="io.choerodon.agile.infra.dto.IssueCountDTO">
+        select fsmn.status_id as id,fit.name as name from fd_state_machine_scheme_config fsmsc
+        ,fd_state_machine_node fsmn,fd_issue_type fit
+        where fsmsc.organization_id = #{organizationId}
+        AND fsmsc.scheme_id = #{schemeId}
+        AND fsmsc.state_machine_id = fsmn.state_machine_id
+        AND fsmn.status_id in
+        <foreach collection="statusIds" item="statusId" open="(" close=")" separator=",">
+           #{statusId}
+        </foreach>
+        AND fit.id = fsmsc.issue_type_id
+        AND fit.type_code not in ('issue_auto_test','issue_auto_test')
+        AND fsmsc.issue_type_id != 0
+        group by fsmn.status_id,fit.name
+    </select>
+
+    <select id="selectInitNode" resultType="io.choerodon.agile.infra.dto.StateMachineNodeDTO">
+        select fsmn.* from fd_state_machine_scheme_config fsmsc
+        ,fd_state_machine_node fsmn
+         where fsmsc.organization_id = #{organizationId}
+         AND fsmsc.scheme_id = #{schemeId}
+         AND fsmsc.state_machine_id = fsmn.state_machine_id
+         AND fsmn.status_id = #{statusId}
+         AND fsmn.type = 'node_init'
     </select>
 </mapper>

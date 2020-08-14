@@ -8,7 +8,10 @@ import {
 import {
   Button, Tabs, Table, Select, Icon, Tooltip, Spin, Checkbox,
 } from 'choerodon-ui';
+// import pic from './no_epic.svg';
+import STATUS from '@/constants/STATUS';
 import pic from '../../../assets/image/emptyChart.svg';
+// import finish from './legend/finish.svg';
 import SwithChart from '../Component/switchChart';
 import StatusTag from '../../../components/StatusTag';
 import PriorityTag from '../../../components/PriorityTag';
@@ -22,7 +25,6 @@ import sprintIcon from './sprintIcon.svg';
 import storyPointIcon from './storyPointIcon.svg';
 import completed from './completed.svg';
 import './EpicReport.less';
-import { STATUS } from '../../../common/Constant';
 
 const { AppState } = stores;
 const { Option } = Select;
@@ -436,7 +438,7 @@ class EpicBurndown extends Component {
               onClick={() => {
                 const { history } = this.props;
                 const urlParams = AppState.currentMenuType;
-                history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramName=${issueNum}&paramIssueId=${record.issueId}&paramUrl=reporthost/EpicBurndown`);
+                history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramName=${issueNum}&paramIssueId=${encodeURIComponent(record.issueId)}&paramUrl=reporthost/EpicBurndown`);
               }}
             >
               {issueNum}
@@ -499,7 +501,6 @@ class EpicBurndown extends Component {
               <Tooltip mouseEnterDelay={0.5} title={`任务状态:${record.statusVO.name}`}>
                 <span>
                   <StatusTag
-                    inTable
                     style={{ display: 'inline-block', minWidth: 50 }}
                     name={record.statusVO.name}
                     color={STATUS[record.statusVO.type]}
@@ -587,7 +588,7 @@ class EpicBurndown extends Component {
     let urlPush = `/agile/work-list/issue?type=${type}&id=${id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${organizationId}&orgId=${urlParams.organizationId}`;
     if (JSON.stringify(item) !== '{}') {
       if (linkType === 'epic') {
-        urlPush += `&paramName=${item.issueNum}&paramIssueId=${item.issueId}&paramUrl=reporthost/epicBurndown`;
+        urlPush += `&paramName=${item.issueNum}&paramIssueId=${encodeURIComponent(item.issueId)}&paramUrl=reporthost/epicBurndown`;
       }
       history.push(urlPush);
     }
@@ -604,7 +605,7 @@ class EpicBurndown extends Component {
           <div style={{ textAlign: 'left', marginLeft: '50px' }}>
             <span style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.65)' }}>报表不能显示</span>
             <p style={{ marginTop: 10, fontSize: 20 }}>
-              {'在此史诗中没有预估的故事，请在'}
+              在此史诗中没有预估的故事，请在
               <a
                 role="none"
                 onClick={() => {
@@ -613,9 +614,9 @@ class EpicBurndown extends Component {
                   history.push(`/agile/work-list/backlog?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramUrl=reporthost/epicBurndown`);
                 }}
               >
-                {'待办事项'}
+                待办事项
               </a>
-              {'中创建故事并预估故事点。'}
+              中创建故事并预估故事点。
             </p>
           </div>
           {/* {'当前史诗下没有故事点'} */}
@@ -629,7 +630,7 @@ class EpicBurndown extends Component {
             ES.reload ? null : (
               <div style={{ position: 'relative' }}>
                 <div className="c7n-chart-yaxixName">
-                  {'故事点'}
+                  故事点
                 </div>
                 <ReactEcharts
                   ref={(e) => { this.echarts_react = e; }}
@@ -826,7 +827,7 @@ class EpicBurndown extends Component {
     const { checkbox, tabActiveKey, linkFromParamUrl } = this.state;
     const urlParams = AppState.currentMenuType;
     return (
-      <Page className="c7n-epicBurndown">
+      <Page className="c7n-epicBurndown" service={['choerodon.code.project.operation.chart.ps.choerodon.code.project.operation.chart.ps.epicburndown']}>
         <Header
           title="史诗燃耗图"
           // backPath={`/agile/${linkFromParamUrl || 'reporthost'}?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}`}
@@ -941,7 +942,7 @@ class EpicBurndown extends Component {
                         history.push(`/agile/work-list/backlog?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramUrl=reporthost/EpicBurndown`);
                       }}
                     >
-                      {'待办事项'}
+                      待办事项
                     </span>
                     <span>或</span>
                     <span
@@ -952,7 +953,7 @@ class EpicBurndown extends Component {
                         history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramUrl=reporthost/EpicBurndown`);
                       }}
                     >
-                      {'问题管理'}
+                      问题管理
                     </span>
                     <span>中创建一个史诗</span>
                   </div>

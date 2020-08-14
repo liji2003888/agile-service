@@ -1,10 +1,14 @@
 import React, { Component } from 'react';
 import {
-  Modal, Form, Input, Select, Icon, Button, DatePicker,
+  Modal, Form, Input, Select, Icon, Button, DatePicker, TimePicker,
 } from 'choerodon-ui';
-import { Content, stores, axios } from '@choerodon/boot';
+import { stores } from '@choerodon/boot';
 import moment from 'moment';
 import _ from 'lodash';
+import IsInProgramStore from '@/stores/common/program/IsInProgramStore';
+import {
+  sprintApi, epicApi, featureApi, userApi, versionApi, fieldApi, issueLabelApi, priorityApi, statusApi, quickFilterApi, commonApi, componentApi, issueTypeApi, 
+} from '@/api';
 import { NumericInput } from '../../../../../components/CommonComponent';
 
 const { Sidebar } = Modal;
@@ -15,6 +19,19 @@ const FormItem = Form.Item;
 
 let sign = -1;
 
+const customFieldType = {
+  radio: 'option',
+  checkbox: 'option',
+  time: 'date_hms',
+  datetime: 'date',
+  number: 'number',
+  input: 'string',
+  text: 'text',
+  single: 'option',
+  multiple: 'option',
+  member: 'option',
+  date: 'date',
+};
 class AddComponent extends Component {
   constructor(props) {
     super(props);
@@ -58,11 +75,17 @@ class AddComponent extends Component {
     // [=, !=, in, notIn]
     const equal_notEqual_in_notin = new Set(['priority', 'issue_type', 'status']);
     // [=, !=, in, notIn, is, isNot]
-    const equal_notEqual_in_notIn_is_isNot = new Set(['assignee', 'reporter', 'created_user', 'last_updated_user', 'epic', 'sprint', 'label', 'component', 'influence_version', 'fix_version']);
+    const equal_notEqual_in_notIn_is_isNot = new Set(['assignee', 'reporter', 'created_user', 'last_updated_user', 'epic', 'sprint', 'label', 'component', 'influence_version', 'fix_version', 'feature', 'member']);
     // [>, >=, <, <=]
-    const greater_greaterAndEqual_lessThan_lessThanAndEqual = new Set(['last_update_date', 'creation_date']);
+    const greater_greaterAndEqual_lessThan_lessThanAndEqual = new Set(['last_update_date', 'creation_date', 'date', 'dateTime', 'time']);
     // [>, >=, <, <=, is, isNot]
-    const greater_greaterAndEqual_lessThan_lessThanAndEqual_is_isNot_equal = new Set(['story_point', 'remain_time']);
+    const greater_greaterAndEqual_lessThan_lessThanAndEqual_is_isNot_equal = new Set(['story_point', 'remain_time', 'number']);
+    // [=, !=, is, isNot]
+    const equal_notEqual_is_isNot = new Set(['single', 'radio']);
+    // [in, notIn, is, isNot]
+    const in_notIn_is_isNot = new Set(['multiple', 'checkbox']);
+    //[=, !=, like, notLike]
+    const equal_notEqual_like_notLike = new Set(['input', 'text']);
     /* eslint-enable */
 
     if (equal_notEqual_in_notin.has(filter)) {
@@ -73,11 +96,19 @@ class AddComponent extends Component {
       return 'is (=,!=,in,notin,is,isNot)';
     } else if (greater_greaterAndEqual_lessThan_lessThanAndEqual_is_isNot_equal.has(filter)) {
       return 'is (>,>=,<,<=,is,isNot)';
+    } else if (equal_notEqual_is_isNot.has(filter)) {
+      return 'is (=, !=, is, isNot)';
+    } else if (in_notIn_is_isNot.has(filter)) {
+      return 'is (in, notIn, is, isNot)';
+    } else if (equal_notEqual_like_notLike.has(filter)) {
+      return 'is (=, !=, like, notLike)';
     }
     return null;
   };
 
   getOperation = (filter) => {
+    const { quickFilterFiled } = this.state;
+    const field = quickFilterFiled.find(item => item.fieldCode === filter) || {};
     const operationGroupBase = [
       [
         {
@@ -143,8 +174,63 @@ class AddComponent extends Component {
           text: '等于',
         },
       ],
+      [
+        {
+          value: '=',
+          text: '等于',
+        },
+        {
+          value: '!=',
+          text: '不等于',
+        },
+        {
+          value: 'is',
+          text: '是',
+        },
+        {
+          value: 'isNot',
+          text: '不是',
+        },
+      ],
+      [
+        {
+          value: 'in',
+          text: '包含',
+        },
+        {
+          value: 'notIn',
+          text: '不包含',
+        },
+        {
+          value: 'is',
+          text: '是',
+        },
+        {
+          value: 'isNot',
+          text: '不是',
+        },
+      ],
+      [
+        {
+          value: '=',
+          text: '等于',
+        },
+        {
+          value: '!=',
+          text: '不等于',
+        },
+        {
+          value: 'like',
+          text: '包含',
+        },
+        {
+          value: 'notLike',
+          text: '不包含',
+        },
+      ],
     ];
-    switch (this.getFilterGroup(filter)) {
+
+    switch (this.getFilterGroup(field.id ? field.type : filter)) {
       case 'is (=,!=,in,notin)':
         return operationGroupBase[0];
       case 'is (>,>=,<,<=)':
@@ -153,29 +239,15 @@ class AddComponent extends Component {
         return operationGroupAdv[0];
       case 'is (>,>=,<,<=,is,isNot)':
         return operationGroupAdv[1];
+      case 'is (=, !=, is, isNot)': 
+        return operationGroupAdv[2];
+      case 'is (in, notIn, is, isNot)': 
+        return operationGroupAdv[3];
+      case 'is (=, !=, like, notLike)': 
+        return operationGroupAdv[4];
       default:
         return [];
     }
-    // const OPERATION_FILTER = {
-    //   priority: ['=', '!=', 'in', 'notIn'],
-    //   issue_type: ['=', '!=', 'in', 'notIn'],
-    //   status: ['=', '!=', 'in', 'notIn'],
-    //   assignee: ['=', '!=', 'is', 'isNot', 'in', 'notIn'],
-    //   reporter: ['=', '!=', 'is', 'isNot', 'in', 'notIn'],
-    //   created_user: ['=', '!=', 'is', 'isNot', 'in', 'notIn'],
-    //   last_updated_user: ['=', '!=', 'is', 'isNot', 'in', 'notIn'],
-    //   epic: ['=', '!=', 'is', 'isNot', 'in', 'notIn'],
-    //   sprint: ['=', '!=', 'is', 'isNot', 'in', 'notIn'],
-    //   label: ['=', '!=', 'is', 'isNot', 'in', 'notIn'],
-    //   component: ['=', '!=', 'is', 'isNot', 'in', 'notIn'],
-    //   influence_version: ['=', '!=', 'is', 'isNot', 'in', 'notIn'],
-    //   fix_version: ['=', '!=', 'is', 'isNot', 'in', 'notIn'],
-    //   creation_date: ['>', '>=', '<', '<='],
-    //   last_update_date: ['>', '>=', '<', '<='],
-    //   story_point: ['<', '<=', '=', '>=', '>', 'is', 'isNot'],
-    //   remain_time: ['<', '<=', '=', '>=', '>', 'is', 'isNot'],
-    // };
-    // return OPERATION_FILTER[filter] || [];
   };
 
   /**
@@ -186,7 +258,7 @@ class AddComponent extends Component {
   checkSearchNameRepeat = (rule, value, callback) => {
     const { originFilterName } = this.state;
     if (value && value.trim() && value.trim() !== originFilterName) {
-      axios.get(`/agile/v1/projects/${AppState.currentMenuType.id}/quick_filter/check_name?quickFilterName=${value}`)
+      quickFilterApi.checkName(value.trim())
         .then((res) => {
           if (res) {
             callback('快速搜索名称重复');
@@ -201,40 +273,43 @@ class AddComponent extends Component {
 
   loadFilter = (id) => {
     const { filterId } = this.props;
-    axios.get(`/agile/v1/projects/${AppState.currentMenuType.id}/quick_filter/${id || filterId}`)
-      .then((res) => {
-        if (res && res.description) {
-          const description = res.description.split('+').slice(0, -3).join('+') || '';
-          const obj = JSON.parse(res.description.split('+').slice(-1));
-          this.setState({
-            arr: this.transformInit(obj.arr || []),
-            o: obj.o || [],
-            origin: {
-              ...res,
-              description,
-            },
-            originFilterName: res.name,
-          });
-        }
-      });
+    quickFilterApi.load(id || filterId).then((res) => {
+      if (res && res.description) {
+        const description = res.description.split('+').slice(0, -3).join('+') || '';
+        const obj = JSON.parse(res.description.split('+').slice(-1));
+        this.setState({
+          arr: this.transformInit(obj.arr || []),
+          o: obj.o || [],
+          origin: {
+            ...res,
+            description,
+          },
+          originFilterName: res.name,
+        });
+      }
+    });
   };
 
   loadQuickFilterFiled = () => {
-    axios.get(`/agile/v1/projects/${AppState.currentMenuType.id}/quick_filter/fields`)
-      .then((res) => {
-        this.setState({
-          quickFilterFiled: res,
-        });
+    const getPreDefinedField = () => quickFilterApi.loadField();
+    const getCustomField = () => fieldApi.getCustomFields();
+    Promise.all([getPreDefinedField(), getCustomField()]).then(([preDefinedField, customField]) => {
+      this.setState({
+        quickFilterFiled: [...preDefinedField, ...IsInProgramStore.isInProgram ? [{ fieldCode: 'feature', type: 'long', name: '特性' }] : [], ...customField].map(field => ({ ...field, fieldCode: field.code || field.fieldCode, type: field.fieldType || field.type })) || [],
       });
+    });
   };
 
   tempOption = (filter, addEmpty) => {
     const { state } = this;
     const projectId = AppState.currentMenuType.id;
     const orgId = AppState.currentMenuType.organizationId;
+    const { quickFilterFiled } = state;
+    const customFields = quickFilterFiled.filter(item => item.id);
+    const customMemberField = quickFilterFiled.find(item => item.type === 'member') || {};
     const OPTION_FILTER = {
       assignee: {
-        url: `/base/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
+        url: `/iam/choerodon/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
         prop: 'list',
         id: 'id',
         name: 'realName',
@@ -255,21 +330,21 @@ class AddComponent extends Component {
         state: 'originStatus',
       },
       reporter: {
-        url: `/base/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
+        url: `/iam/choerodon/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
         prop: 'list',
         id: 'id',
         name: 'realName',
         state: 'originUsers',
       },
       created_user: {
-        url: `/base/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
+        url: `/iam/choerodon/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
         prop: 'list',
         id: 'id',
         name: 'realName',
         state: 'originUsers',
       },
       last_updated_user: {
-        url: `/base/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
+        url: `/iam/choerodon/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
         prop: 'list',
         id: 'id',
         name: 'realName',
@@ -327,12 +402,38 @@ class AddComponent extends Component {
         name: 'name',
         state: 'originTypes',
       },
+      feature: {
+        url: `/agile/v1/projects/${projectId}/issues/feature/all?organizationId=${orgId}&page=0&size=0&param=`,
+        prop: '',
+        id: 'issueId',
+        name: 'summary',
+        state: 'originFeatures',
+      },
     };
-    const arr = state[OPTION_FILTER[filter].state].map(v => (
+
+    customFields.forEach((item) => {
+      OPTION_FILTER[item.code] = {
+        url: '',
+        prop: '',
+        id: 'id',
+        name: 'value',
+        state: `origin${item.code}`,
+      };
+    });
+
+    OPTION_FILTER[customMemberField.code] = {
+      url: `/iam/choerodon/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
+      prop: 'list',
+      id: 'id',
+      name: 'realName',
+      state: 'originUsers',
+    };
+    const arr = (state[OPTION_FILTER[filter].state] || []).map(v => (
       <Option key={v[OPTION_FILTER[filter].id]} value={v[OPTION_FILTER[filter].id]}>
         {v[OPTION_FILTER[filter].name]}
       </Option>
     ));
+   
     if (addEmpty) {
       arr.unshift(
         <Option key="null" value="null">
@@ -355,6 +456,8 @@ class AddComponent extends Component {
       '<=': '<=',
       '>': '>',
       '>=': '>=',
+      like: 'like',
+      'not like': 'notLike',
     };
     return OPERATION[value];
   };
@@ -371,6 +474,8 @@ class AddComponent extends Component {
       '<=': '<=',
       '>': '>',
       '>=': '>=',
+      like: 'like',
+      notLike: 'not like',
     };
     return OPERATION[value];
   };
@@ -448,9 +553,12 @@ class AddComponent extends Component {
     const { state } = this;
     const projectId = AppState.currentMenuType.id;
     const orgId = AppState.currentMenuType.organizationId;
+    const { quickFilterFiled } = state;
+    const customFields = quickFilterFiled.filter(item => item.id);
+    const customMemberField = quickFilterFiled.find(item => item.type === 'member') || {};
     const OPTION_FILTER = {
       assignee: {
-        url: `/base/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
+        url: `/iam/choerodon/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
         prop: 'list',
         id: 'id',
         name: 'realName',
@@ -471,21 +579,21 @@ class AddComponent extends Component {
         state: 'originStatus',
       },
       reporter: {
-        url: `/base/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
+        url: `/iam/choerodon/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
         prop: 'list',
         id: 'id',
         name: 'realName',
         state: 'originUsers',
       },
       created_user: {
-        url: `/base/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
+        url: `/iam/choerodon/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
         prop: 'list',
         id: 'id',
         name: 'realName',
         state: 'originUsers',
       },
       last_updated_user: {
-        url: `/base/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
+        url: `/iam/choerodon/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
         prop: 'list',
         id: 'id',
         name: 'realName',
@@ -543,7 +651,35 @@ class AddComponent extends Component {
         name: 'name',
         state: 'originTypes',
       },
+      feature: {
+        url: `/agile/v1/projects/${projectId}/issues/feature/all?organizationId=${orgId}&page=0&size=0&param=`,
+        prop: '',
+        id: 'issueId',
+        name: 'summary',
+        state: 'originFeatures',
+      },
     };
+
+    customFields.forEach((item) => {
+      OPTION_FILTER[item.code] = {
+        url: '',
+        prop: '',
+        id: 'id',
+        name: 'value',
+        state: `origin${item.code}`,
+      };
+    });
+
+    OPTION_FILTER[customMemberField.code] = {
+      url: `/iam/choerodon/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`,
+      prop: 'list',
+      id: 'id',
+      name: 'realName',
+      state: 'originUsers',
+    };
+
+    const field = quickFilterFiled.find(item => item.fieldCode === filter) || {};
+
     if (sign === index) {
       if (operation === 'in' || operation === 'notIn') {
         sign = -1;
@@ -553,9 +689,16 @@ class AddComponent extends Component {
         return undefined;
       }
     }
-    if (filter === 'creation_date' || filter === 'last_update_date') {
+    if (filter === 'creation_date' || filter === 'last_update_date' || (field.id && field.type === 'datetime')) {
       // return moment
       return moment(value, 'YYYY-MM-DD HH:mm:ss');
+    }
+    if (field.id && field.type === 'date') {
+      // return moment
+      return moment(value, 'YYYY-MM-DD');
+    }
+    if (field.id && field.type === 'time') {
+      return moment(value);
     }
     if (operation === 'is' || operation === 'isNot' || operation === 'is not') {
       return ({
@@ -563,22 +706,22 @@ class AddComponent extends Component {
         label: '空',
       });
     }
-    if (filter === 'story_point' || filter === 'remain_time') {
+    if (filter === 'story_point' || filter === 'remain_time' || (field.id && (field.type === 'number' || field.type === 'input' || field.type === 'text'))) {
       return value;
     }
     if (filter === 'priority') {
       if (operation === 'in' || operation === 'notIn' || operation === 'not in') {
         const arr = value.slice(1, -1).split(',');
         return arr.map((v) => {
-          const priority = _.find(state[OPTION_FILTER[filter].state], { id: v * 1 });
+          const priority = _.find(state[OPTION_FILTER[filter].state], { id: v });
           return {
-            key: v * 1,
+            key: v,
             label: priority ? priority.name : v,
           };
         });
       } else {
         const k = value;
-        const priority = _.find(state[OPTION_FILTER[filter].state], { [OPTION_FILTER[filter].id]: k * 1 });
+        const priority = _.find(state[OPTION_FILTER[filter].state], { [OPTION_FILTER[filter].id]: k });
         return ({
           key: k,
           label: priority ? priority.name : k,
@@ -603,15 +746,17 @@ class AddComponent extends Component {
     } else if (operation === 'in' || operation === 'notIn' || operation === 'not in') {
       const arr = value.slice(1, -1).split(',');
       return arr.map(v => ({
-        key: v * 1,
+        key: v,
         label: _.find(state[OPTION_FILTER[filter].state],
-          { [OPTION_FILTER[filter].id]: v * 1 })
+          { [OPTION_FILTER[filter].id]: value })
           ? _.find(state[OPTION_FILTER[filter].state],
-            { [OPTION_FILTER[filter].id]: v * 1 })[OPTION_FILTER[filter].name]
+            { [OPTION_FILTER[filter].id]: v })[OPTION_FILTER[filter].name]
           : undefined,
       }));
+    } else if (operation === 'like' || operation === 'not like') {
+      return value;
     } else {
-      const k = value * 1;
+      const k = value;
       return ({
         key: k,
         label: _.find(state[OPTION_FILTER[filter].state],
@@ -639,10 +784,13 @@ class AddComponent extends Component {
           if (deleteItem.indexOf(i) !== -1) {
             return;
           }
+          const field = quickFilterFiled.find(item => item.fieldCode === v.fieldCode) || {};
           const a = {
             fieldCode: values[`filter-${i}-prop`],
             operation: this.transformOperation2(values[`filter-${i}-rule`]),
             value: this.getValue(values[`filter-${i}-value`], values[`filter-${i}-prop`]),
+            predefined: !field.id,
+            customFieldType: field.id ? customFieldType[field.type] : undefined,
           };
           if (i) {
             o.push(values[`filter-${i}-ao`]);
@@ -672,7 +820,7 @@ class AddComponent extends Component {
         this.setState({
           loading: true,
         });
-        axios.put(`/agile/v1/projects/${AppState.currentMenuType.id}/quick_filter/${filterId}`, obj)
+        quickFilterApi.update(filterId, obj)
           .then((res) => {
             this.setState({
               loading: false,
@@ -685,16 +833,23 @@ class AddComponent extends Component {
 
   loadQuickFilter() {
     const projectId = AppState.currentMenuType.id;
-    const orgId = AppState.currentMenuType.organizationId;
-    axios.get(`/base/v1/projects/${AppState.currentMenuType.id}/users?page=1&size=0`).then(res => this.setState({ originUsers: res.list }));
-    axios.get(`/agile/v1/projects/${projectId}/priority/list_by_org`).then(res => this.setState({ originPriorities: res }));
-    axios.get(`/agile/v1/projects/${projectId}/schemes/query_status_by_project_id?apply_type=agile`).then(res => this.setState({ originStatus: res }));
-    axios.get(`/agile/v1/projects/${projectId}/issues/epics/select_data`).then(res => this.setState({ originEpics: res }));
-    axios.post(`/agile/v1/projects/${projectId}/sprint/names`).then(res => this.setState({ originSprints: res }));
-    axios.get(`/agile/v1/projects/${projectId}/issue_labels`).then(res => this.setState({ originLabels: res }));
-    axios.get(`/agile/v1/projects/${projectId}/component`).then(res => this.setState({ originComponents: res }));
-    axios.post(`/agile/v1/projects/${projectId}/product_version/names`).then(res => this.setState({ originVersions: res }));
-    axios.get(`/agile/v1/projects/${projectId}/schemes/query_issue_types?apply_type=agile`).then(res => this.setState({ originTypes: res }));
+    userApi.getAllInProject().then(res => this.setState({ originUsers: res.list }));
+    priorityApi.loadByProject().then(res => this.setState({ originPriorities: res }));
+    statusApi.loadByProject().then(res => this.setState({ originStatus: res }));
+    epicApi.loadEpicsForSelect().then(res => this.setState({ originEpics: res }));
+    sprintApi.loadSprints().then(res => this.setState({ originSprints: res }));
+    issueLabelApi.loads().then(res => this.setState({ originLabels: res }));
+    componentApi.loadAll().then(res => this.setState({ originComponents: res }));
+    versionApi.loadNamesByStatus().then(res => this.setState({ originVersions: res }));
+    issueTypeApi.loadAll().then(res => this.setState({ originTypes: res }));
+    featureApi.queryAllInSubProject([], undefined, 1, 0).then(res => this.setState({ originFeatures: res.content }));
+    fieldApi.getCustomFields().then((res) => {
+      const customFieldState = {};
+      res.forEach((item) => {
+        customFieldState[`origin${item.code}`] = item.fieldOptions || [];
+      });
+      this.setState(customFieldState);
+    });
   }
 
   renderOperation(filter, index) {
@@ -711,7 +866,7 @@ class AddComponent extends Component {
             sign = index;
             const str = `filter-${index}-value`;
             let value;
-            if (v === 'in' || v === 'notIn' || v === 'not in') {
+            if (v === 'in' || v === 'notIn' || v === 'not in' || v === 'like' || v === 'notLike' || v === 'not like') {
               value = [];
             } else {
               value = undefined;
@@ -732,6 +887,8 @@ class AddComponent extends Component {
   }
 
   renderValue(filter, opera) {
+    const { quickFilterFiled } = this.state;
+    const field = quickFilterFiled.find(item => item.fieldCode === filter) || {};
     let operation;
     if (opera === 'not in') {
       operation = 'notIn';
@@ -744,7 +901,7 @@ class AddComponent extends Component {
       return (
         <Select label="值" />
       );
-    } else if (['assignee', 'priority', 'status', 'reporter', 'created_user', 'last_update_user', 'epic', 'sprint', 'label', 'component', 'influence_version', 'fix_version', 'issue_type'].indexOf(filter) > -1) {
+    } else if (['assignee', 'priority', 'status', 'reporter', 'created_user', 'last_update_user', 'epic', 'sprint', 'label', 'component', 'influence_version', 'fix_version', 'issue_type', 'feature'].indexOf(filter) > -1 || (field.id && (field.type === 'member' || field.type === 'single' || field.type === 'multiple' || field.type === 'radio' || field.type === 'checkbox'))) {
       // select
       if (['=', '!='].indexOf(operation) > -1) {
         // return normal value
@@ -795,7 +952,7 @@ class AddComponent extends Component {
           </Select>
         );
       }
-    } else if (['creation_date', 'last_update_date'].indexOf(filter) > -1) {
+    } else if (['creation_date', 'last_update_date'].indexOf(filter) > -1 || (field.id && field.type === 'datetime')) {
       // time
       // return data picker
       return (
@@ -804,6 +961,35 @@ class AddComponent extends Component {
           label="值"
           format="YYYY-MM-DD HH:mm:ss"
           showTime
+        />
+      );
+    } else if (field.id && field.type === 'date') {
+      return (
+        <DatePicker
+          style={{ width: '100%' }}
+          label="值"
+          format="YYYY-MM-DD"
+        />
+      );
+    } else if (field.id && field.type === 'time') {
+      return (
+        <TimePicker
+          style={{ width: '100%' }}
+          label="值"
+        />
+      );
+    } else if (field.id && field.type === 'input') {
+      return (
+        <Input
+          style={{ width: '100%' }}
+          label="值"
+        />
+      );
+    } else if (field.id && field.type === 'text') {
+      return (
+        <TextArea
+          style={{ width: '100%' }}
+          label="值"
         />
       );
     } else {

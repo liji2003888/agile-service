@@ -1,24 +1,37 @@
 package io.choerodon.agile.app.service.impl;
 
+import java.io.IOException;
+import java.util.*;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.choerodon.agile.api.vo.QuickFilterSearchVO;
 import io.choerodon.agile.api.vo.QuickFilterSequenceVO;
 import io.choerodon.agile.api.vo.QuickFilterVO;
-import io.choerodon.agile.api.vo.QuickFilterSearchVO;
 import io.choerodon.agile.api.vo.QuickFilterValueVO;
+import io.choerodon.agile.app.service.ObjectSchemeFieldService;
+import io.choerodon.agile.app.service.QuickFilterFieldService;
 import io.choerodon.agile.app.service.QuickFilterService;
+import io.choerodon.agile.infra.dto.ObjectSchemeFieldDTO;
 import io.choerodon.agile.infra.dto.QuickFilterDTO;
+import io.choerodon.agile.infra.dto.QuickFilterFieldDTO;
+import io.choerodon.agile.infra.enums.CustomFieldType;
 import io.choerodon.agile.infra.mapper.QuickFilterFieldMapper;
 import io.choerodon.agile.infra.mapper.QuickFilterMapper;
+import io.choerodon.agile.infra.utils.EncryptionUtils;
+import io.choerodon.agile.infra.utils.ProjectUtil;
 import io.choerodon.core.exception.CommonException;
+import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang.StringUtils;
+import org.hzero.starter.keyencrypt.core.EncryptProperties;
+import org.hzero.starter.keyencrypt.core.EncryptionService;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
-import org.modelmapper.convention.MatchingStrategies;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import javax.annotation.PostConstruct;
-import java.util.ArrayList;
-import java.util.List;
+import org.springframework.util.ObjectUtils;
 
 /**
  * Created by HuangFuqiang@choerodon.io on 2018/6/13.
@@ -28,73 +41,95 @@ import java.util.List;
 @Transactional(rollbackFor = Exception.class)
 public class QuickFilterServiceImpl implements QuickFilterService {
 
-    private static final String NOT_IN = "not in";
-    private static final String IS_NOT = "is not";
+    protected static final String NOT_IN = "not in";
+    protected static final String IS_NOT = "is not";
+    protected static final String NULL_STR = "null";
+    protected static final String IS = "is";
 
     @Autowired
     private QuickFilterMapper quickFilterMapper;
 
     @Autowired
-    private QuickFilterFieldMapper quickFilterFieldMapper;
+    protected QuickFilterFieldMapper quickFilterFieldMapper;
+
+    @Autowired
+    private ObjectSchemeFieldService objectSchemeFieldService;
+
+    @Autowired
+    private ProjectUtil projectUtil;
 
     private static final String NOT_FOUND = "error.QuickFilter.notFound";
+    @Autowired
+    private ModelMapper modelMapper;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @Autowired
+    private QuickFilterFieldService quickFilterFieldService;
 
-    private ModelMapper modelMapper = new ModelMapper();
+    private EncryptionService encryptionService = new EncryptionService(new EncryptProperties());
 
-    @PostConstruct
-    public void init() {
-        modelMapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
-    }
-
-    private void dealCaseComponent(String field, String value, String operation, StringBuilder sqlQuery) {
-        if ("null".equals(value)) {
-            if ("is".equals(operation)) {
+    protected void dealCaseComponent(String field, String value, String operation, StringBuilder sqlQuery) {
+        if (NULL_STR.equals(value)) {
+            if (IS.equals(operation)) {
                 sqlQuery.append(" issue_id not in ( select issue_id from agile_component_issue_rel )  ");
             } else if (IS_NOT.equals(operation)) {
                 sqlQuery.append(" issue_id in ( select issue_id from agile_component_issue_rel )  ");
             }
         } else {
             if (NOT_IN.equals(operation)) {
-                sqlQuery.append(" issue_id not in ( select issue_id from agile_component_issue_rel where component_id in " + value + " ) ");
+                sqlQuery.append(" issue_id not in ( select issue_id from agile_component_issue_rel where component_id in " + inSql(operation,value) + " ) ");
             } else {
-                sqlQuery.append(" issue_id in ( select issue_id from agile_component_issue_rel where " + field + " " + operation + " " + value + " ) ");
+                sqlQuery.append(" issue_id in ( select issue_id from agile_component_issue_rel where " + field + " " + operation + " " + inSql(operation,value) + " ) ");
             }
         }
     }
 
+    private String inSql(String operation,String value){
+        String sql = null;
+        if(NOT_IN.equals(operation) || "in".equals(operation)){
+            String[] split = EncryptionUtils.subString(value);
+            List<Long> list = EncryptionUtils.decryptList(Arrays.asList(split), EncryptionUtils.BLANK_KEY, null);
+            sql = "(" +StringUtils.join(list,",")+ ")";
+        }
+        else {
+            sql = EncryptionUtils.decrypt(value,EncryptionUtils.BLANK_KEY).toString();
+        }
+        return sql;
+    }
+
     private void dealFixVersion(QuickFilterValueVO quickFilterValueVO, String field, String value, String operation, StringBuilder sqlQuery) {
-        if ("null".equals(value)) {
-            if ("is".equals(operation)) {
+        if (NULL_STR.equals(value)) {
+            if (IS.equals(operation)) {
                 sqlQuery.append(" issue_id not in ( select issue_id from agile_version_issue_rel where relation_type = 'fix' ) ");
             } else if (IS_NOT.equals(operation)) {
                 sqlQuery.append(" issue_id in ( select issue_id from agile_version_issue_rel where relation_type = 'fix' ) ");
             }
         } else {
             if (NOT_IN.equals(operation)) {
-                sqlQuery.append(" issue_id not in ( select issue_id from agile_version_issue_rel where version_id in " + value + " and relation_type = 'fix' ) ");
+                sqlQuery.append(" issue_id not in ( select issue_id from agile_version_issue_rel where version_id in " + inSql(operation,value) + " and relation_type = 'fix' ) ");
             } else {
-                sqlQuery.append(" issue_id in ( select issue_id from agile_version_issue_rel where " + field + " " + quickFilterValueVO.getOperation() + " " + value + " and relation_type = 'fix' ) ");
+                sqlQuery.append(" issue_id in ( select issue_id from agile_version_issue_rel where " + field + " " + quickFilterValueVO.getOperation() + " " + inSql(operation,value) + " and relation_type = 'fix' ) ");
             }
         }
     }
 
     private void dealInfluenceVersion(QuickFilterValueVO quickFilterValueVO, String field, String value, String operation, StringBuilder sqlQuery) {
-        if ("null".equals(value)) {
-            if ("is".equals(operation)) {
+        if (NULL_STR.equals(value)) {
+            if (IS.equals(operation)) {
                 sqlQuery.append(" issue_id not in ( select issue_id from agile_version_issue_rel where relation_type = 'influence' ) ");
             } else if (IS_NOT.equals(operation)) {
                 sqlQuery.append(" issue_id in ( select issue_id from agile_version_issue_rel where relation_type = 'influence' ) ");
             }
         } else {
             if (NOT_IN.equals(operation)) {
-                sqlQuery.append(" issue_id not in ( select issue_id from agile_version_issue_rel where version_id in " + value + " and relation_type = 'influence' ) ");
+                sqlQuery.append(" issue_id not in ( select issue_id from agile_version_issue_rel where version_id in " + inSql(operation,value) + " and relation_type = 'influence' ) ");
             } else {
-                sqlQuery.append(" issue_id in ( select issue_id from agile_version_issue_rel where " + field + " " + quickFilterValueVO.getOperation() + " " + value + " and relation_type = 'influence' ) ");
+                sqlQuery.append(" issue_id in ( select issue_id from agile_version_issue_rel where " + field + " " + inSql(operation,value) + " " + EncryptionUtils.decrypt(value, EncryptionUtils.BLANK_KEY) + " and relation_type = 'influence' ) ");
             }
         }
     }
 
-    private void dealCaseVersion(QuickFilterValueVO quickFilterValueVO, String field, String value, String operation, StringBuilder sqlQuery) {
+    protected void dealCaseVersion(QuickFilterValueVO quickFilterValueVO, String field, String value, String operation, StringBuilder sqlQuery) {
         if ("fix_version".equals(quickFilterValueVO.getFieldCode())) {
             dealFixVersion(quickFilterValueVO, field, value, operation, sqlQuery);
         } else if ("influence_version".equals(quickFilterValueVO.getFieldCode())) {
@@ -102,67 +137,56 @@ public class QuickFilterServiceImpl implements QuickFilterService {
         }
     }
 
-    private void dealCaseLabel(String field, String value, String operation, StringBuilder sqlQuery) {
-        if ("null".equals(value)) {
-            if ("is".equals(operation)) {
+    protected void dealCaseLabel(String field, String value, String operation, StringBuilder sqlQuery) {
+        if (NULL_STR.equals(value)) {
+            if (IS.equals(operation)) {
                 sqlQuery.append(" issue_id not in ( select issue_id from agile_label_issue_rel ) ");
             } else if (IS_NOT.equals(operation)) {
                 sqlQuery.append(" issue_id in ( select issue_id from agile_label_issue_rel ) ");
             }
         } else {
             if (NOT_IN.equals(operation)) {
-                sqlQuery.append(" issue_id not in ( select issue_id from agile_label_issue_rel where label_id in " + value + " ) ");
+                sqlQuery.append(" issue_id not in ( select issue_id from agile_label_issue_rel where label_id in " + inSql(operation,value) + " ) ");
             } else {
-                sqlQuery.append(" issue_id in ( select issue_id from agile_label_issue_rel where " + field + " " + operation + " " + value + " ) ");
+                sqlQuery.append(" issue_id in ( select issue_id from agile_label_issue_rel where " + field + " " + operation + " " + inSql(operation,value) + " ) ");
             }
         }
     }
 
-    private void dealCaseSprint(String field, String value, String operation, StringBuilder sqlQuery) {
-        if ("null".equals(value)) {
-            if ("is".equals(operation)) {
+    protected void dealCaseSprint(String field, String value, String operation, StringBuilder sqlQuery) {
+        if (NULL_STR.equals(value)) {
+            if (IS.equals(operation)) {
                 sqlQuery.append(" issue_id not in ( select issue_id from agile_issue_sprint_rel ) ");
             } else if (IS_NOT.equals(operation)) {
                 sqlQuery.append(" issue_id in ( select issue_id from agile_issue_sprint_rel ) ");
             }
         } else {
             if (NOT_IN.equals(operation)) {
-                sqlQuery.append(" issue_id not in ( select issue_id from agile_issue_sprint_rel where sprint_id in " + value + " ) ");
+                sqlQuery.append(" issue_id not in ( select issue_id from agile_issue_sprint_rel where sprint_id in " + inSql(operation,value) + " ) ");
             } else {
-                sqlQuery.append(" issue_id in ( select issue_id from agile_issue_sprint_rel where " + field + " " + operation + " " + value + " ) ");
+                sqlQuery.append(" issue_id in ( select issue_id from agile_issue_sprint_rel where " + field + " " + operation + " " + inSql(operation,value) + " ) ");
             }
         }
     }
 
-    private String getSqlQuery(List<QuickFilterValueVO> quickFilterValueVOList, List<String> relationOperations, Boolean childIncluded) {
+    private String getSqlQuery(QuickFilterVO quickFilterVO, Long projectId) {
+        Long organizationId = projectUtil.getOrganizationId(projectId);
+        List<QuickFilterValueVO> quickFilterValueVOList = quickFilterVO.getQuickFilterValueVOList();
+        List<String> relationOperations = quickFilterVO.getRelationOperations();
+        Boolean childIncluded = quickFilterVO.getChildIncluded();
         StringBuilder sqlQuery = new StringBuilder();
         int idx = 0;
         for (QuickFilterValueVO quickFilterValueVO : quickFilterValueVOList) {
-            String field = quickFilterFieldMapper.selectByPrimaryKey(quickFilterValueVO.getFieldCode()).getField();
-            String value = "'null'".equals(quickFilterValueVO.getValue()) ? "null" : quickFilterValueVO.getValue();
-            String operation = quickFilterValueVO.getOperation();
-            switch (field) {
-                case "component_id":
-                    dealCaseComponent(field, value, operation, sqlQuery);
-                    break;
-                case "version_id":
-                    dealCaseVersion(quickFilterValueVO, field, value, operation, sqlQuery);
-                    break;
-                case "label_id":
-                    dealCaseLabel(field, value, operation, sqlQuery);
-                    break;
-                case "sprint_id":
-                    dealCaseSprint(field, value, operation, sqlQuery);
-                    break;
-                case "creation_date":
-                    sqlQuery.append(" unix_timestamp(" + field + ")" + " " + quickFilterValueVO.getOperation() + " " + "unix_timestamp('" + value + "') ");
-                    break;
-                case "last_update_date":
-                    sqlQuery.append(" unix_timestamp(" + field + ")" + " " + quickFilterValueVO.getOperation() + " " + "unix_timestamp('" + value + "') ");
-                    break;
-                default:
-                    sqlQuery.append(" " + field + " " + quickFilterValueVO.getOperation() + " " + value + " ");
-                    break;
+            Boolean predefined = quickFilterValueVO.getPredefined();
+            String fieldCode = quickFilterValueVO.getFieldCode();
+            if (ObjectUtils.isEmpty(predefined)) {
+                String errorMsg = "error." + fieldCode + ".predefined.null";
+                throw new CommonException(errorMsg);
+            }
+            if (predefined) {
+                appendPredefinedFieldSql(sqlQuery, quickFilterValueVO, projectId);
+            } else {
+                sqlQuery.append(appendCustomFieldSql(quickFilterValueVO, organizationId, projectId));
             }
             int length = relationOperations.size();
             if (idx < length && !relationOperations.get(idx).isEmpty()) {
@@ -176,6 +200,189 @@ public class QuickFilterServiceImpl implements QuickFilterService {
         return sqlQuery.toString();
     }
 
+    private String appendCustomFieldSql(QuickFilterValueVO quickFilterValueVO, Long organizationId, Long projectId) {
+        String fieldCode = quickFilterValueVO.getFieldCode();
+        ObjectSchemeFieldDTO objectSchemeField = objectSchemeFieldService.queryByFieldCode(organizationId, projectId, fieldCode);
+        if (ObjectUtils.isEmpty(objectSchemeField)) {
+            throw new CommonException("error.custom.field." + fieldCode + ".not.existed");
+        }
+        Long fieldId = objectSchemeField.getId();
+        String value = "'null'".equals(quickFilterValueVO.getValue()) ? NULL_STR : quickFilterValueVO.getValue();
+        String operation = quickFilterValueVO.getOperation();
+        String customFieldType = quickFilterValueVO.getCustomFieldType();
+        CustomFieldType.contains(customFieldType, true);
+
+        String selectSql =
+                " select ffv.instance_id from fd_field_value ffv where ffv.project_id = " + projectId
+                        + " and ffv.field_id = " + fieldId;
+        if (CustomFieldType.isOption(customFieldType)) {
+            return getOptionOrNumberSql(EncryptionUtils.handlerFilterEncryptList(value,false), operation, selectSql, "ffv.option_id");
+        } else if (CustomFieldType.isDate(customFieldType)) {
+            return getDateSql(value, operation, selectSql);
+        } else if (CustomFieldType.isDateHms(customFieldType)) {
+            return getDateHmsSql(value, operation, selectSql);
+        } else if (CustomFieldType.isNumber(customFieldType)) {
+            return getOptionOrNumberSql(value, operation, selectSql, "ffv.number_value");
+        } else if (CustomFieldType.isString(customFieldType)) {
+            return getStringOrTextSql(value, operation, selectSql, "ffv.string_value");
+        } else  {
+            //text
+            return getStringOrTextSql(value, operation, selectSql, "ffv.text_value");
+        }
+    }
+
+    private String getStringOrTextSql(String value, String operation, String selectSql, String column) {
+        if (NULL_STR.equals(value)) {
+            if (IS.equals(operation)) {
+                StringBuilder build = new StringBuilder(" issue_id not in ( ");
+                build.append(selectSql).append(")");
+                return build.toString();
+            } else if (IS_NOT.equals(operation)) {
+                StringBuilder build = new StringBuilder(" issue_id in ( ");
+                build.append(selectSql).append(")");
+                return build.toString();
+            } else {
+                return "1=1";
+            }
+        } else {
+            StringBuilder likeSql = new StringBuilder();
+            likeSql
+                    .append(" ( ")
+                    .append(selectSql)
+                    .append(" and ")
+                    .append(column)
+                    .append(" like concat(concat('%', '")
+                    .append(value)
+                    .append("'), '%')")
+                    .append(" ) ");
+            if ("not like".equals(operation)) {
+                return "issue_id not in " + likeSql.toString();
+            } else if ("like".equals(operation)) {
+                return "issue_id in " + likeSql.toString();
+            } else {
+                StringBuilder builder = new StringBuilder(" issue_id in ");
+                builder
+                        .append(" ( ")
+                        .append(selectSql)
+                        .append(" and ")
+                        .append(column)
+                        .append(" ")
+                        .append(operation)
+                        .append(" '")
+                        .append(value)
+                        .append("' ) ");
+                return builder.toString();
+
+            }
+        }
+    }
+
+    private String getOptionOrNumberSql(String value, String operation, String selectSql, String column) {
+        if (NULL_STR.equals(value)) {
+            if (IS.equals(operation)) {
+                StringBuilder build = new StringBuilder(" issue_id not in ( ");
+                build.append(selectSql).append(")");
+                return build.toString();
+            } else if (IS_NOT.equals(operation)) {
+                StringBuilder build = new StringBuilder(" issue_id in ( ");
+                build.append(selectSql).append(")");
+                return build.toString();
+            } else {
+                return "1=1";
+            }
+        } else {
+            if (NOT_IN.equals(operation)) {
+                StringBuilder builder = new StringBuilder(" issue_id not in ");
+                builder
+                        .append(" ( ")
+                        .append(selectSql)
+                        .append(" and ")
+                        .append(column)
+                        .append(" in ")
+                        .append(value)
+                        .append(" ) ");
+                return builder.toString();
+            } else {
+                StringBuilder builder = new StringBuilder(" issue_id in ");
+                builder
+                        .append(" ( ")
+                        .append(selectSql)
+                        .append(" and ")
+                        .append(column)
+                        .append(" ")
+                        .append(operation)
+                        .append(" ")
+                        .append(value)
+                        .append(" ) ");
+                return builder.toString();
+            }
+        }
+    }
+
+    private String getDateHmsSql(String value, String operation, String selectSql) {
+        StringBuilder build = new StringBuilder(" issue_id in ");
+        build
+                .append(" ( ")
+                .append(selectSql)
+                .append(" and time(DATE_FORMAT(ffv.date_value, '%H:%i:%s')) ")
+                .append(operation)
+                .append(" time('")
+                .append(value)
+                .append("')) ");
+        return build.toString();
+    }
+
+    private String getDateSql(String value, String operation, String selectSql) {
+        StringBuilder build = new StringBuilder(" issue_id in ");
+        build
+                .append(" ( ")
+                .append(selectSql)
+                .append(" and unix_timestamp(ffv.date_value) ")
+                .append(operation)
+                .append(" unix_timestamp('")
+                .append(value)
+                .append("')) ");
+        return build.toString();
+    }
+
+    protected void appendPredefinedFieldSql(StringBuilder sqlQuery, QuickFilterValueVO quickFilterValueVO, Long projectId) {
+        String value = "'null'".equals(quickFilterValueVO.getValue()) ? NULL_STR : quickFilterValueVO.getValue();
+        String operation = quickFilterValueVO.getOperation();
+        processPredefinedField(sqlQuery, quickFilterValueVO, value, operation);
+    }
+
+    protected void processPredefinedField(StringBuilder sqlQuery, QuickFilterValueVO quickFilterValueVO, String value, String operation) {
+        String field = quickFilterFieldMapper.selectByPrimaryKey(quickFilterValueVO.getFieldCode()).getField();
+        switch (field) {
+            case "component_id":
+                dealCaseComponent(field, value, operation, sqlQuery);
+                break;
+            case "version_id":
+                dealCaseVersion(quickFilterValueVO, field, value, operation, sqlQuery);
+                break;
+            case "label_id":
+                dealCaseLabel(field, value, operation, sqlQuery);
+                break;
+            case "sprint_id":
+                dealCaseSprint(field, value, operation, sqlQuery);
+                break;
+            case "creation_date":
+                sqlQuery.append(" unix_timestamp(" + field + ")" + " " + quickFilterValueVO.getOperation() + " " + "unix_timestamp('" + value + "') ");
+                break;
+            case "last_update_date":
+                sqlQuery.append(" unix_timestamp(" + field + ")" + " " + quickFilterValueVO.getOperation() + " " + "unix_timestamp('" + value + "') ");
+                break;
+            default:
+                if(Arrays.asList(EncryptionUtils.FIELD_VALUE).contains(field)){
+                    sqlQuery.append(" " + field + " " + quickFilterValueVO.getOperation() + " " + value + " ");
+                }
+                else {
+                    sqlQuery.append(" " + field + " " + quickFilterValueVO.getOperation() + " " + inSql(operation,value) + " ");
+                }
+                break;
+        }
+    }
+
     @Override
     public QuickFilterVO create(Long projectId, QuickFilterVO quickFilterVO) {
         if (!projectId.equals(quickFilterVO.getProjectId())) {
@@ -184,8 +391,12 @@ public class QuickFilterServiceImpl implements QuickFilterService {
         if (checkName(projectId, quickFilterVO.getName())) {
             throw new CommonException("error.quickFilterName.exist");
         }
-        String sqlQuery = getSqlQuery(quickFilterVO.getQuickFilterValueVOList(), quickFilterVO.getRelationOperations(), quickFilterVO.getChildIncluded());
+        Optional.ofNullable(quickFilterVO.getQuickFilterValueVOList())
+                .orElse(Collections.emptyList()).forEach(this::decryptValueList);
+        String sqlQuery = getSqlQuery(quickFilterVO, projectId);
         QuickFilterDTO quickFilterDTO = modelMapper.map(quickFilterVO, QuickFilterDTO.class);
+        String description = quickFilterDTO.getDescription();
+        quickFilterDTO.setDescription(handlerFilterDescription(description,false));
         quickFilterDTO.setSqlQuery(sqlQuery);
         //设置编号
         Integer sequence = quickFilterMapper.queryMaxSequenceByProject(projectId);
@@ -194,6 +405,21 @@ public class QuickFilterServiceImpl implements QuickFilterService {
             throw new CommonException("error.quickFilter.insert");
         }
         return modelMapper.map(quickFilterMapper.selectByPrimaryKey(quickFilterDTO.getFilterId()), QuickFilterVO.class);
+    }
+
+    private void decryptValueList(QuickFilterValueVO filter) {
+        if (Boolean.FALSE.equals(filter.getPredefined())) {
+            if (CustomFieldType.isOption(filter.getCustomFieldType())) {
+                filter.setValue(handlerFilterEncryptList(filter.getValue(), false));
+            }
+        } else {
+            if (!"'null'".equals(filter.getValue())) {
+                String field = Optional.ofNullable(quickFilterFieldService.selectByFieldCode(filter.getFieldCode())).map(QuickFilterFieldDTO::getField).orElse(null);
+                if (!Arrays.asList(EncryptionUtils.FIELD_VALUE).contains(field)) {
+                    filter.setValue(handlerFilterEncryptList(filter.getValue(), false));
+                }
+            }
+        }
     }
 
     private Boolean checkNameUpdate(Long projectId, Long filterId, String quickFilterName) {
@@ -216,10 +442,11 @@ public class QuickFilterServiceImpl implements QuickFilterService {
         if (quickFilterVO.getName() != null && checkNameUpdate(projectId, filterId, quickFilterVO.getName())) {
             throw new CommonException("error.quickFilterName.exist");
         }
-        String sqlQuery = getSqlQuery(quickFilterVO.getQuickFilterValueVOList(), quickFilterVO.getRelationOperations(), quickFilterVO.getChildIncluded());
+        String sqlQuery = getSqlQuery(quickFilterVO, projectId);
         quickFilterVO.setFilterId(filterId);
         QuickFilterDTO quickFilterDTO = modelMapper.map(quickFilterVO, QuickFilterDTO.class);
         quickFilterDTO.setSqlQuery(sqlQuery);
+        quickFilterDTO.setDescription(handlerFilterDescription(quickFilterVO.getDescription(),false));
         return updateBySelective(quickFilterDTO);
     }
 
@@ -240,12 +467,14 @@ public class QuickFilterServiceImpl implements QuickFilterService {
         if (quickFilterDTO == null) {
             throw new CommonException("error.quickFilter.get");
         }
+        quickFilterDTO.setDescription(handlerFilterDescription(quickFilterDTO.getDescription(),true));
         return modelMapper.map(quickFilterDTO, QuickFilterVO.class);
     }
 
     @Override
     public List<QuickFilterVO> listByProjectId(Long projectId, QuickFilterSearchVO quickFilterSearchVO) {
         List<QuickFilterDTO> quickFilterDTOList = quickFilterMapper.queryFiltersByProjectId(projectId, quickFilterSearchVO.getFilterName(), quickFilterSearchVO.getContents());
+        quickFilterDTOList.forEach(v -> v.setDescription(handlerFilterDescription(v.getDescription(),true)));
         if (quickFilterDTOList != null && !quickFilterDTOList.isEmpty()) {
             return modelMapper.map(quickFilterDTOList, new TypeToken<List<QuickFilterVO>>(){}.getType());
         } else {
@@ -317,4 +546,87 @@ public class QuickFilterServiceImpl implements QuickFilterService {
         return modelMapper.map(quickFilterMapper.selectByPrimaryKey(quickFilterDTO.getFilterId()), QuickFilterVO.class);
     }
 
+    /**
+     * 处理快速筛选描述中加解密问题
+     *
+     * @param description
+     * @param encrypt
+     * @return
+     */
+    public  String handlerFilterDescription(String description, boolean encrypt) {
+        String prefix = description.substring(0, description.lastIndexOf("+") + 1);
+        StringBuilder stringBuilder = new StringBuilder(prefix);
+        String oriName = description.substring(description.lastIndexOf("+") + 1);
+        try {
+            JsonNode jsonNode = objectMapper.readTree(oriName);
+            JsonNode arr = jsonNode.get("arr");
+            stringBuilder.append("{\"arr\":[");
+            if (arr.isArray()) {
+                Iterator<JsonNode> elements = arr.elements();
+                while (elements.hasNext()) {
+                    JsonNode next = elements.next();
+                    ObjectNode objectNode = (ObjectNode) next;
+                    decryptFilterJson(objectNode, encrypt);
+                    stringBuilder.append(objectMapper.writeValueAsString(objectNode));
+                    if (elements.hasNext()) {
+                        stringBuilder.append(",");
+                    }
+                }
+            }
+            stringBuilder.append("]");
+            JsonNode op = jsonNode.get("o");
+            if (!ObjectUtils.isEmpty(op)) {
+                stringBuilder.append(",\"o\":"+objectMapper.writeValueAsString(op));
+            }
+            stringBuilder.append("}");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return stringBuilder.toString();
+    }
+
+    private  void decryptFilterJson(ObjectNode objectNode, boolean encrypt) {
+        boolean predefined = true;
+        JsonNode jsonNode = objectNode.get("predefined");
+        if(!ObjectUtils.isEmpty(jsonNode)){
+            predefined = jsonNode.booleanValue();
+        }
+        String value = objectNode.get("value").asText();
+        String fieldCode = objectNode.get("fieldCode").asText();
+        if (Boolean.FALSE.equals(predefined)) {
+            String customFieldType = objectNode.get("customFieldType").textValue();
+            if (CustomFieldType.isOption(customFieldType)) {
+                objectNode.put("value", handlerFilterEncryptList(value, encrypt));
+            }
+        } else {
+            if (!"'null'".equals(value)) {
+                String field = Optional.ofNullable(quickFilterFieldService.selectByFieldCode(fieldCode)).map(QuickFilterFieldDTO::getField).orElse(null);;
+                if (!Arrays.asList(EncryptionUtils.FIELD_VALUE).contains(field)) {
+                    objectNode.put("value", handlerFilterEncryptList(value, encrypt));
+                }
+            }
+        }
+    }
+
+    public  String handlerFilterEncryptList(String value, boolean encrypt) {
+        StringBuilder build = new StringBuilder();
+        if(value.contains("(")){
+            build.append("(");
+            String[] split = EncryptionUtils.subString(value);
+            if (!ArrayUtils.isEmpty(split)) {
+                List<String> list = Arrays.asList(split);
+                for (String s : list) {
+                    build.append(encrypt ? encryptionService.encrypt(s, EncryptionUtils.BLANK_KEY) : EncryptionUtils.decrypt(s, EncryptionUtils.BLANK_KEY));
+                    if (list.indexOf(s) != (list.size() - 1)) {
+                        build.append(",");
+                    }
+                }
+            }
+            build.append(")");
+        }
+        else {
+            build.append(encrypt ? encryptionService.encrypt(value, EncryptionUtils.BLANK_KEY) : EncryptionUtils.decrypt(value, EncryptionUtils.BLANK_KEY));
+        }
+        return build.toString();
+    }
 }

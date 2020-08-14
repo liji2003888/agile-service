@@ -3,30 +3,11 @@
   align-items: flex-start;
   margin-bottom: 10px;
   margin-right: 38px;
+  margin-top: 5px;
 
   &-left {
-
     flex: 1;
     margin-right: 15px;
-
-    &-row {
-      display: flex;
-      align-items: center;
-      transition: all 0.3s ease-in-out;
-
-      &-hidden {
-        opacity: 0;
-        height: 0;
-        margin-left: 185px;
-        overflow: hidden;
-      }
-
-      &-more {
-        opacity: 1;
-        height: 36px;
-        margin-left: 185px;
-      }
-    }
 
     .c7n-calendar-range-picker {
       &:hover {
@@ -36,29 +17,33 @@
       &:before {
         border: none !important;
       }
-      .c7n-calendar-range-picker-input:nth-of-type(1) {          
-        text-align: left;
-      }
-      .c7n-calendar-range-picker-separator {
-        margin-left: -4px;
-      }
     }
 
-    .c7nagile-RangePicker-empty {
-      .c7n-calendar-range-picker {
-        .c7n-calendar-range-picker-separator {
-          display: none;
-        }        
+    .field[data-type="text"],
+    .field[data-type="number"],
+    .field[data-type="input"] {
+      .c7n-input {
+        height: 30px;
+      }
+
+      .c7n-input-label-wrapper {
+        transform: translateY(-3px);
+      }
+
+      .c7n-input-has-value .c7n-input-label-wrapper,
+      .c7n-input-focused .c7n-input-label-wrapper {
+        transform: scaleX(0.8);
       }
     }
   }
 
   &-right {
+    width: 130px;
     margin-left: auto;
     display: flex;
     align-items: center;
     height: 20px;
-    margin-top: 8px;
+    margin-top: 9px;
     margin-right: 30px;
   }
 
@@ -69,6 +54,7 @@
     display: flex;
     align-items: center;
     width: 100%;
+    margin-top: 5px;
 
     .icon {
       margin: 0 5px;

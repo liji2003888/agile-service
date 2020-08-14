@@ -4,14 +4,12 @@ import io.choerodon.agile.app.service.IIssueCommentService;
 import io.choerodon.agile.infra.annotation.DataLog;
 import io.choerodon.agile.infra.dto.IssueCommentDTO;
 import io.choerodon.agile.infra.mapper.IssueCommentMapper;
+import io.choerodon.agile.infra.utils.BaseFieldUtil;
 import io.choerodon.core.exception.CommonException;
-import io.choerodon.mybatis.entity.Criteria;
 import org.modelmapper.ModelMapper;
-import org.modelmapper.convention.MatchingStrategies;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.PostConstruct;
 
 @Service
 public class IIssueCommentServiceImpl implements IIssueCommentService {
@@ -22,13 +20,8 @@ public class IIssueCommentServiceImpl implements IIssueCommentService {
 
     @Autowired
     private IssueCommentMapper issueCommentMapper;
-
-    private ModelMapper modelMapper = new ModelMapper();
-
-    @PostConstruct
-    public void init() {
-        modelMapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
-    }
+    @Autowired
+    private ModelMapper modelMapper;
 
     @Override
     @DataLog(type = "createComment")
@@ -36,17 +29,19 @@ public class IIssueCommentServiceImpl implements IIssueCommentService {
         if (issueCommentMapper.insert(issueCommentDTO) != 1) {
             throw new CommonException(INSERT_ERROR);
         }
+        BaseFieldUtil.updateIssueLastUpdateInfo(issueCommentDTO.getIssueId(), issueCommentDTO.getProjectId());
         return modelMapper.map(issueCommentMapper.selectByPrimaryKey(issueCommentDTO.getCommentId()), IssueCommentDTO.class);
     }
 
     @Override
     @DataLog(type = "updateComment")
     public IssueCommentDTO updateBase(IssueCommentDTO issueCommentDTO, String[] fieldList) {
-        Criteria criteria = new Criteria();
-        criteria.update(fieldList);
-        if (issueCommentMapper.updateByPrimaryKeyOptions(issueCommentDTO, criteria) != 1) {
+//        Criteria criteria = new Criteria();
+//        criteria.update(fieldList);
+        if (issueCommentMapper.updateOptional(issueCommentDTO, fieldList) != 1) {
             throw new CommonException(UPDATE_ERROR);
         }
+        BaseFieldUtil.updateIssueLastUpdateInfoByCommentId(issueCommentMapper, issueCommentDTO.getCommentId());
         return modelMapper.map(issueCommentMapper.selectByPrimaryKey(issueCommentDTO.getCommentId()), IssueCommentDTO.class);
     }
 
@@ -57,6 +52,7 @@ public class IIssueCommentServiceImpl implements IIssueCommentService {
         if (isDelete != 1) {
             throw new CommonException(DELETE_ERROR);
         }
+        BaseFieldUtil.updateIssueLastUpdateInfo(issueCommentDTO.getIssueId(), issueCommentDTO.getProjectId());
         return isDelete;
     }
 }

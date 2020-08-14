@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { observer, inject } from 'mobx-react';
-import EditIssue from '../../../../components/EditIssue';
-import ScrumBoardStore from '../../../../stores/project/scrumBoard/ScrumBoardStore';
+import EditIssue from '@/components/EditIssue';
+import ScrumBoardStore from '@/stores/project/scrumBoard/ScrumBoardStore';
 
 @inject('AppState')
 @observer
@@ -14,26 +14,22 @@ class IssueDetail extends Component {
   }
 
   handleResetClicked = (data) => {
-    // ScrumBoardStore.setIssue(data);
-    if (ScrumBoardStore.getCurrentClickId !== data.issueId) {
-      // 确认当前跳转点击
-      ScrumBoardStore.resetCurrentClick(data.issueId, true);
-      ScrumBoardStore.setIssue(data);
-    }
+    ScrumBoardStore.setClickedIssue(data.issueId);
   }
 
   render() {
     const { refresh } = this.props;
+    const issueId = ScrumBoardStore.getCurrentClickId;
     return (
       <EditIssue
-        visible={ScrumBoardStore.getClickedIssue}
+        visible={issueId}
         forwardedRef={this.EditIssue}
         backUrl="scrumboard"
-        issueId={ScrumBoardStore.getCurrentClickId}
+        issueId={issueId}
         onCancel={() => {
           ScrumBoardStore.resetClickedIssue();
         }}
-        onCurrentClicked={this.handleResetClicked}
+        afterIssueUpdate={this.handleResetClicked}
         onDeleteIssue={() => {
           ScrumBoardStore.resetClickedIssue();
           refresh(ScrumBoardStore.getBoardList.get(ScrumBoardStore.getSelectedBoard));
@@ -42,7 +38,7 @@ class IssueDetail extends Component {
           refresh(ScrumBoardStore.getBoardList.get(ScrumBoardStore.getSelectedBoard));
         }}
         resetIssue={(parentIssueId) => {
-          ScrumBoardStore.resetCurrentClick(parentIssueId);
+          ScrumBoardStore.setClickedIssue(parentIssueId);
         }}
       />
     );

@@ -3,8 +3,7 @@
 }
 
 .c7n-collapse-item.c7n-swimlaneContext-container.noStoryInEpic > .c7n-collapse-header,
-.c7n-collapse-item.c7n-swimlaneContext-container.swimlane_none > .c7n-collapse-header,
-  {
+.c7n-collapse-item.c7n-swimlaneContext-container.swimlane_none > .c7n-collapse-header {
   display: none !important;
 }
 
@@ -45,9 +44,11 @@
       display: flex;
       align-items: center;
       height: 0.44rem;
-      padding: 0.12rem 0 !important;
+      padding: 12px 25px !important;
     }
-
+    .c7n-collapse-expand-icon {
+      left: 3px !important;
+    }
     .c7n-collapse-header > .c7n-collapse-header {
       margin: 0 0.12rem;
     }
@@ -116,7 +117,7 @@
     &-container {
       transition: all 0.2ms;
       width: 100%;
-      min-height: 0.83rem;
+      min-height: 102px;
 
       &-dragOn {
         border-color: #1ab16f;
@@ -145,7 +146,8 @@
   }
 
   &-itemBodyCard {
+    // height: 117px;
     cursor: all-scroll !important;
-    margin: 0.04rem;
+    // margin: 0.04rem;
   }
 }

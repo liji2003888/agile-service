@@ -1,56 +1,86 @@
 import React, { Component } from 'react';
-import { observer, inject } from 'mobx-react';
-import { withRouter } from 'react-router-dom';
-import { injectIntl } from 'react-intl';
-import TextEditToggle from '../../../../TextEditToggle';
+import { observer } from 'mobx-react';
+import { Tooltip } from 'choerodon-ui';
+import SelectPI from '@/components/select/select-pi';
+import TextEditToggle from '@/components/TextEditTogglePro';
+import { piApi } from '@/api';
 
-const { Text, Edit } = TextEditToggle;
-
-@inject('AppState')
-@observer class FieldPI extends Component {
-  constructor(props) {
-    super(props);
-    this.state = {};
+@observer
+class FieldPI extends Component {
+  updateIssuePI = async (value) => {
+    const {
+      store, onUpdate, reloadIssue, 
+    } = this.props;
+    const issue = store.getIssue;
+    const { issueId, activePi } = issue;
+    const { id } = activePi || {};
+    await piApi.addFeatures([issueId], id || 0, value || 0);
+    if (onUpdate) {
+      onUpdate();
+    }    
+    await reloadIssue(issueId);
   }
 
-  componentDidMount() {
-  }
 
   render() {
-    const { store } = this.props;
+    const { store, hasPermission, disabled } = this.props;
     const issue = store.getIssue;
-    const { activePi = {} } = issue;
-    const name = activePi ? activePi.name : undefined;
+    const { activePi, closePi } = issue;
+    const {
+      name, code, id, statusCode,
+    } = activePi || {};
     return (
       <div className="line-start mt-10">
         <div className="c7n-property-wrapper">
           <span className="c7n-property">
-            {'PI'}
+            PI
           </span>
         </div>
         <div className="c7n-value-wrapper">
           <TextEditToggle
-            disabled
-            // formKey="pi"
-            // onSubmit={this.updateIssuePI}
-            originData={name}
+            disabled={(disabled) || (!hasPermission && statusCode === 'doing')}
+            onSubmit={this.updateIssuePI}
+            initValue={id}
+            editor={({ submit }) => (
+              <SelectPI 
+                statusList={['todo', 'doing']} 
+                multiple={false}
+                allowClear
+                onChange={submit}
+              />
+            )}
           >
-            <Text>
-              {
-                name ? (
-                  <div>
-                    {name}
-                  </div>
-                ) : (
-                  <div>
-                    {'无'}
-                  </div>
-                )
-              }
-            </Text>
-            <Edit>
-              <span>{name}</span>
-            </Edit>
+            <Tooltip
+              placement="top"
+              title={`该特性经历PI数${closePi.length + (id ? 1 : 0)}`}
+            >
+              <div>
+                {
+                    !closePi.length && !id ? '无' : (
+                      <div>
+                        <div>
+                          {closePi.map(p => `${p.code}-${p.name}`).join(' , ')}
+                        </div>
+                        {
+                          id && (
+                            <div
+                              style={{
+                                color: '#4d90fe',
+                                fontSize: '13px',
+                                lineHeight: '20px',
+                                display: 'inline-block',
+                                marginTop: closePi.length ? 5 : 0,
+                              }}
+                            >
+                              {`${code}-${name}`}
+                            </div>
+                          )
+                        }
+                      </div>
+                    )
+                  }
+              </div>
+            </Tooltip>
           </TextEditToggle>
         </div>
       </div>
@@ -58,4 +88,4 @@ const { Text, Edit } = TextEditToggle;
   }
 }
 
-export default withRouter(injectIntl(FieldPI));
+export default FieldPI;

@@ -5,8 +5,9 @@ import io.choerodon.agile.api.vo.*;
 import io.choerodon.agile.infra.dto.GroupDataChartDTO;
 import io.choerodon.agile.infra.dto.GroupDataChartListDTO;
 import io.choerodon.agile.infra.mapper.ReportMapper;
-import com.github.pagehelper.PageInfo;
-import org.springframework.data.domain.Pageable;
+import io.choerodon.core.domain.Page;
+import io.choerodon.core.domain.PageInfo;
+import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 
 import java.util.Date;
 import java.util.List;
@@ -38,7 +39,7 @@ public interface ReportService {
      */
     List<CumulativeFlowDiagramVO> queryCumulativeFlowDiagram(Long projectId, CumulativeFlowFilterVO cumulativeFlowFilterVO);
 
-    PageInfo<IssueListVO> queryIssueByOptions(Long projectId, Long versionId, String status, String type, Pageable pageable, Long organizationId);
+    Page<IssueListVO> queryIssueByOptions(Long projectId, Long versionId, String status, String type, PageRequest pageRequest, Long organizationId);
 
     Map<String, Object> queryVersionLineChart(Long projectId, Long versionId, String type);
 
@@ -126,4 +127,12 @@ public interface ReportService {
      * 修复累积流图
      */
     void fixCumulativeFlowDiagram();
+
+    /**
+     * 插件迭代bug统计趋势
+     * @param projectId 项目id
+     * @param sprintId 冲刺id
+     * @return 趋势
+     */
+    IssueCountVO selectBugBysprint(Long projectId, Long sprintId);
 }

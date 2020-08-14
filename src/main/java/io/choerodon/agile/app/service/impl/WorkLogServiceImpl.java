@@ -12,15 +12,14 @@ import io.choerodon.agile.infra.dto.IssueDTO;
 import io.choerodon.agile.infra.dto.UserMessageDTO;
 import io.choerodon.agile.infra.mapper.IssueMapper;
 import io.choerodon.agile.infra.mapper.WorkLogMapper;
+import io.choerodon.agile.infra.utils.BaseFieldUtil;
 import io.choerodon.core.exception.CommonException;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
-import org.modelmapper.convention.MatchingStrategies;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.PostConstruct;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -55,13 +54,8 @@ public class WorkLogServiceImpl implements WorkLogService {
 
     @Autowired
     private IWorkLogService iWorkLogService;
-
-    private ModelMapper modelMapper = new ModelMapper();
-
-    @PostConstruct
-    public void init() {
-        modelMapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
-    }
+    @Autowired
+    private ModelMapper modelMapper;
 
     private void setTo(Long issueId, BigDecimal predictionTime) {
         IssueConvertDTO issueConvertDTO = modelMapper.map(issueMapper.selectByPrimaryKey(issueId), IssueConvertDTO.class);
@@ -111,6 +105,7 @@ public class WorkLogServiceImpl implements WorkLogService {
                     break;
             }
         }
+        BaseFieldUtil.updateIssueLastUpdateInfo(workLogVO.getIssueId(), projectId);
         WorkLogDTO res = iWorkLogService.createBase(modelMapper.map(workLogVO, WorkLogDTO.class));
         return queryWorkLogById(res.getProjectId(), res.getLogId());
     }
@@ -120,6 +115,7 @@ public class WorkLogServiceImpl implements WorkLogService {
         WorkLogValidator.checkUpdateWorkLog(workLogVO);
         workLogVO.setProjectId(projectId);
         WorkLogDTO res = updateBase(modelMapper.map(workLogVO, WorkLogDTO.class));
+        BaseFieldUtil.updateIssueLastUpdateInfo(res.getIssueId(), res.getProjectId());
         return queryWorkLogById(res.getProjectId(), res.getLogId());
     }
 

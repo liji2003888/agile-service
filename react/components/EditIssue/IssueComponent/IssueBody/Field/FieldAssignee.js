@@ -2,15 +2,12 @@ import React, { Component } from 'react';
 import { observer, inject } from 'mobx-react';
 import { withRouter } from 'react-router-dom';
 import { injectIntl } from 'react-intl';
-import TextEditToggle from '../../../../TextEditToggle';
-import SelectFocusLoad from '../../../../SelectFocusLoad';
+import { issueApi } from '@/api';
+import TextEditToggle from '@/components/TextEditTogglePro';
+import SelectUser from '@/components/select/select-user';
 import UserHead from '../../../../UserHead';
-import { updateIssue } from '../../../../../api/NewIssueApi';
-import { getSelf } from '../../../../../api/CommonApi';
 import './Field.less';
 
-
-const { Text, Edit } = TextEditToggle;
 
 @inject('AppState')
 @observer class FieldStatus extends Component {
@@ -24,7 +21,7 @@ const { Text, Edit } = TextEditToggle;
       objectVersionNumber,
       assigneeId: assigneeId || 0,
     };
-    updateIssue(obj)
+    issueApi.update(obj)
       .then(() => {
         if (onUpdate) {
           onUpdate();
@@ -46,65 +43,52 @@ const { Text, Edit } = TextEditToggle;
       <div className="line-start mt-10">
         <div className="c7n-property-wrapper">
           <span className="c7n-property">
-            {'经办人'}
+            经办人
           </span>
         </div>
         <div className="c7n-value-wrapper" style={{ display: 'flex', flexWrap: 'nowrap' }}>
           <TextEditToggle
             disabled={disabled}
-            formKey="assignee"
             onSubmit={this.updateIssueAssignee}
-            originData={assigneeId || []}
-            className="assignee"
-            style={{ flex: 1 }}
-          >
-            <Text>
-              {
-                assigneeId ? (
-                  <UserHead
-                    user={{
-                      id: assigneeId,
-                      loginName: assigneeLoginName,
-                      realName: assigneeRealName,
-                      avatar: assigneeImageUrl,
-                      name: assigneeName,
-                    }}
-                  />
-                ) : (
-                  <div>
-                    {'无'}
-                  </div>
-                )
-              }
-            </Text>
-            <Edit>
-              <SelectFocusLoad
-                type="user"
-                defaultOption={{
+            initValue={assigneeId || undefined}
+            editor={({ submit }) => (
+              <SelectUser
+                clearButton
+                onChange={submit}
+                selectedUser={assigneeId ? {
                   id: assigneeId,
                   loginName: assigneeLoginName,
                   realName: assigneeRealName,
-                  avatar: assigneeImageUrl,
+                  imageUrl: assigneeImageUrl,
                   name: assigneeName,
-                }}
-                defaultOpen
-                allowClear
-                dropdownStyle={{ width: 'auto' }}
-                dropdownMatchSelectWidth
-                getPopupContainer={() => document.getElementById('detail')}
-                dropdownAlign={{
-                  points: ['tl', 'bl'],
-                  overflow: { adjustX: true },
-                }}
+                } : undefined}
               />
-            </Edit>
+            )}
+          >
+            {
+              assigneeId ? (
+                <UserHead
+                  user={{
+                    id: assigneeId,
+                    loginName: assigneeLoginName,
+                    realName: assigneeRealName,
+                    avatar: assigneeImageUrl,
+                    name: assigneeName,
+                  }}
+                />
+              ) : (
+                <div>
+                  无
+                </div>
+              )
+            }
           </TextEditToggle>
           {assigneeId !== loginUserId && !disabled
             ? (
               <span
                 role="none"
                 className="primary"
-                style={{                  
+                style={{
                   cursor: 'pointer',
                   marginLeft: '10px',
                   marginRight: 10,
@@ -113,17 +97,15 @@ const { Text, Edit } = TextEditToggle;
                   whiteSpace: 'nowrap',
                 }}
                 onClick={() => {
-                  getSelf().then((res) => {
-                    if (res.id !== assigneeId) {
-                      this.updateIssueAssignee(res.id);
-                    }
-                  });
+                  if (loginUserId !== assigneeId) {
+                    this.updateIssueAssignee(loginUserId);
+                  }
                 }}
               >
-                {'分配给我'}
+                分配给我
               </span>
             ) : ''
-          }
+        }
         </div>
       </div>
     );

@@ -1,16 +1,16 @@
+/* eslint-disable no-shadow */
 import React, {
   useState, useEffect, 
 } from 'react';
 import {
-  Form, Input, Select, message, Button,
+  Form, Input, Select, Button,
 } from 'choerodon-ui';
 import {
-  Content, stores, axios, Choerodon, 
+  Content, stores, Choerodon, 
 } from '@choerodon/boot';
 import _ from 'lodash';
+import { userApi, componentApi } from '@/api';
 import UserHead from '../../../../components/UserHead';
-import { getUsers, getUser } from '../../../../api/CommonApi';
-import { loadComponent, updateComponent } from '../../../../api/ComponentApi';
 import './component.less';
 
 const { Option } = Select;
@@ -49,7 +49,7 @@ const EditComponent = (props) => {
           name: name.trim(),
         };
         setCreateLoading(true);
-        updateComponent(component.componentId, editComponent)
+        componentApi.update(component.componentId, editComponent)
           .then((res) => {
             setCreateLoading(false);
             props.modal.close();
@@ -67,7 +67,7 @@ const EditComponent = (props) => {
   const debounceFilterIssues = _.debounce((text) => {
     setSelectLoading(true);
     setPage(1);
-    getUsers(text, undefined, page).then((res) => {
+    userApi.getAllInProject(text, page).then((res) => {
       setSelectLoading(false);
       setInput(text);
       setPage(1);
@@ -79,7 +79,7 @@ const EditComponent = (props) => {
   const onFilterChange = (input) => {
     if (!sign) {
       setSelectLoading(true);
-      getUsers(input, undefined, page).then((res) => {
+      userApi.getAllInProject(input, page).then((res) => {
         setInput(input);
         setOriginUsers(res.list.filter(u => u.enabled));
         setCanLoadMore(res.hasNextPage);
@@ -92,14 +92,14 @@ const EditComponent = (props) => {
   };
 
   const loadUser = (managerId) => {
-    getUser(managerId).then((res) => {
+    userApi.getById(managerId).then((res) => {
       setManagerId(JSON.stringify(res.list[0]));
       setOriginUsers(res.list.length ? [res.list[0]] : []);
     });
   };
 
   const localLoadComponent = (componentId) => {
-    loadComponent(componentId)
+    componentApi.load(componentId)
       .then((res) => {
         const {
           defaultAssigneeRole, description, managerId, name,
@@ -118,14 +118,13 @@ const EditComponent = (props) => {
 
   const checkComponentNameRepeat = (rule, value, callback) => {
     if (value && value.trim() && value.trim() !== name) {
-      axios.get(`/agile/v1/projects/${AppState.currentMenuType.id}/component/check_name?componentName=${value}`)
-        .then((res) => {
-          if (res) {
-            callback('模块名称重复');
-          } else {
-            callback();
-          }
-        });
+      componentApi.checkName(value.trim()).then((res) => {
+        if (res) {
+          callback('模块名称重复');
+        } else {
+          callback();
+        }
+      });
     } else {
       callback();
     }
@@ -134,26 +133,13 @@ const EditComponent = (props) => {
   const loadMoreUsers = (e) => {
     e.preventDefault();
     setSelectLoading(true);
-    getUsers(input, undefined, page + 1).then((res) => {
+    userApi.getAllInProject(input, undefined, page + 1).then((res) => {
       setOriginUsers([...originUsers, ...res.list.filter(u => u.enabled)]);
       setSelectLoading(false);
       setCanLoadMore(res.hasNextPage);
       setPage(page + 1);
     })
       .catch((e) => { setSelectLoading(true); });
-  };
-
-  const getFirst = (str) => {
-    if (!str) {
-      return '';
-    }
-    const re = /[\u4E00-\u9FA5]/g;
-    for (let i = 0, len = str.length; i < len; i += 1) {
-      if (re.test(str[i])) {
-        return str[i];
-      }
-    }
-    return str[0];
   };
 
   useEffect(() => localLoadComponent(props.componentId), []);
@@ -224,12 +210,7 @@ const EditComponent = (props) => {
                     <Option key={JSON.stringify(user)} value={JSON.stringify(user)}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', padding: '2px' }}>
                         <UserHead
-                          user={{
-                            id: user.id,
-                            loginName: user.loginName,
-                            realName: user.realName,
-                            avatar: user.imageUrl,
-                          }}
+                          user={user}
                         />
                       </div>
                     </Option>

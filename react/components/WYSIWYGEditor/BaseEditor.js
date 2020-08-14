@@ -3,14 +3,15 @@ import { Button, Icon } from 'choerodon-ui';
 import PropTypes from 'prop-types';
 import { isEqual } from 'lodash';
 import ReactQuill, { Quill } from 'react-quill';
+import QuillImageDropAndPaste from 'quill-image-drop-and-paste';
 import 'react-quill/dist/quill.snow.css';
 import LightBox from 'react-image-lightbox';
-import { randomWord } from '../../common/utils';
-import ImageDrop from './ImageDrop';
+import { randomWord } from '@/utils/random';
 import Link from './Link';
 import './BaseEditor.less';
 
-Quill.register('modules/imageDrop', ImageDrop);
+Quill.register('modules/imageDropAndPaste', QuillImageDropAndPaste);
+
 Quill.register('formats/link', Link);
 
 const defaultStyle = {
@@ -82,7 +83,8 @@ class BaseEditor extends Component {
       toolbar: {
         container: `#${this.toolBarId}`,
       },
-      imageDrop: true,
+      imageDropAndPaste: true,
+      // imageDrop: true,
     };
   }
 
@@ -203,14 +205,14 @@ class BaseEditor extends Component {
                 type="primary"
                 onClick={onCancel}
               >
-                {'取消'}
+                取消
               </Button>
               <Button
                 type="primary"
                 loading={loading}
                 onClick={onSave}
               >
-                {'保存'}
+                保存
               </Button>
             </div>
           )

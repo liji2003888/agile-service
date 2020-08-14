@@ -1,7 +1,8 @@
 package io.choerodon.agile.infra.mapper;
 
+import io.choerodon.agile.infra.dto.IssueCountDTO;
 import io.choerodon.agile.infra.dto.StateMachineNodeDTO;
-import io.choerodon.mybatis.common.Mapper;
+import io.choerodon.mybatis.common.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -9,7 +10,7 @@ import java.util.List;
 /**
  * @author peng.jiang, dinghuang123@gmail.com
  */
-public interface StateMachineNodeMapper extends Mapper<StateMachineNodeDTO> {
+public interface StateMachineNodeMapper extends BaseMapper<StateMachineNodeDTO> {
 
     StateMachineNodeDTO getNodeDeployById(@Param("nodeId") Long nodeId);
 
@@ -39,4 +40,14 @@ public interface StateMachineNodeMapper extends Mapper<StateMachineNodeDTO> {
 
     List<StateMachineNodeDTO> queryByStateMachineIds(@Param("organizationId") Long organizationId, @Param("stateMachineIds") List<Long> stateMachineIds);
 
+    /**
+     * 批量插入node
+     * @param nodeList
+     * @return
+     */
+    int batchInsert(@Param("list") List<StateMachineNodeDTO> nodeList);
+
+    List<IssueCountDTO> countIssueTypeByStatusIds(@Param("organizationId") Long organizationId,@Param("schemeId") Long schemeId, @Param("statusIds") List<Long> statusIds);
+
+    List<StateMachineNodeDTO> selectInitNode(@Param("organizationId")  Long organizationId, @Param("schemeId") Long schemeId,@Param("statusId") Long statusId);
 }

@@ -1,24 +1,98 @@
-import transform from '../utils';
+import React, { Fragment } from 'react';
+import { observer } from 'mobx-react-lite';
+import { Button, Icon } from 'choerodon-ui';
+import IssueStore from '@/stores/project/issue/IssueStore';
+import Modal from '../components/Modal';
+import BatchModal from '../components/BatchModal';
 
+let modal;
+function Header({ dataSet, close }) {
+  return (
+    <>
+      <div style={{ fontSize: '30px', fontWeight: 500, marginRight: 12 }}>{dataSet.selected.length}</div>
+      <div style={{ fontSize: '16px' }}>
+        项已选中
+      </div>
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+        <Icon type="mode_edit" />
+        <span style={{ marginLeft: 6 }}>批量修改</span>
+      </div>
+      <div style={{
+        width: 1, height: '100%', margin: '0px 8px 0 15px', background: '#95A5FF',
+      }}
+      />
+      <Button
+        icon="close"
+        shape="circle"
+        style={{ color: 'white', marginRight: -5 }}
+        onClick={close}
+      />
+    </>
+  );
+}
+const ObserverHeader = observer(Header);
+function handleSelect({ dataSet }) {
+  modal = Modal.open({
+    key: 'modal',
+    header: <ObserverHeader
+      dataSet={dataSet}
+      modal={modal}
+      close={() => {
+        modal.close();
+        dataSet.unSelectAll();
+      }}
+    />,
+    content: <BatchModal
+      dataSet={dataSet}
+      modal={modal}
+      fields={IssueStore.fields}
+      onCancel={() => {
+        modal.close();
+        dataSet.unSelectAll();
+      }}
+      onEdit={() => {
+        modal.close();
+        dataSet.unSelectAll();
+        dataSet.query();
+      }}
+    />,
+  });
+}
+function handleUnSelect({ dataSet }) {
+  if (dataSet.selected.length === 0 && modal) {
+    modal.close();
+  }
+}
 export default ({
-  intl, projectId, organizationId, intlPrefix,
+  projectId, organizationId,
 }) => ({
   primaryKey: 'issueId',
   autoQuery: false,
-  selection: false,
-  // selection: 'single',
+  modifiedCheck: false,
+  parentField: 'parentId',
+  expandField: 'expand',
+  idField: 'issueId',
+  paging: 'server',
+  cacheSelection: true,
   transport: {
-    read: {
-      url: `/agile/v1/projects/${projectId}/issues/include_sub?organizationId=${organizationId}`,
+    read: ({ params }) => ({
+      url: `/agile/v1/projects/${projectId}/issues/include_sub`,
       method: 'post',
-      transformRequest: data => JSON.stringify(transform(data)),
-    },
+      params: {
+        ...params,
+        organizationId,
+      },
+      transformRequest: () => {
+        const searchDTO = IssueStore.getCustomFieldFilters();
+        return JSON.stringify(searchDTO);
+      },
+    }),
   },
   fields: [
     { name: 'issueId', type: 'string', label: '概要' },
     { name: 'issueTypeId', type: 'object', label: '问题类型' },
-    { name: 'issueNum', type: 'string', label: '问题编号' },
-    { name: 'priorityId', type: 'string', label: '优先级' },    
+    { name: 'issueNum', type: 'string', label: '任务编号' },
+    { name: 'priorityId', type: 'string', label: '优先级' },
     { name: 'statusId', type: 'object', label: '状态' },
     { name: 'assigneeId', type: 'string', label: '经办人' },
     { name: 'reporterId', type: 'string', label: '报告人' },
@@ -27,12 +101,20 @@ export default ({
     { name: 'storyPoints', type: 'string', label: '故事点' },
     { name: 'version', type: 'string', label: '版本' },
     { name: 'epic', type: 'string', label: '史诗' },
+    { name: 'feature', type: 'string', label: '特性' },
     { name: 'lastUpdateDate', type: 'string', label: '最后更新时间' },
-    { name: 'issueSprintVOS', type: 'array', label: '冲刺' },    
+    { name: 'creationDate', type: 'string', label: '创建时间' },
+    { name: 'issueSprintVOS', type: 'array', label: '冲刺' },
   ],
   queryFields: [
     { name: 'issueTypeId', type: 'array', label: '问题类型' },
     // { name: 'service', type: 'string', label: service },
-    // { name: 'description', type: 'string', label: description },      
+    // { name: 'description', type: 'string', label: description },
   ],
+  events: {
+    select: handleSelect,
+    selectAll: handleSelect,
+    unSelect: handleUnSelect,
+    unSelectAll: handleUnSelect,
+  },
 });

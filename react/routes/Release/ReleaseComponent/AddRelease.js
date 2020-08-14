@@ -1,12 +1,11 @@
 import React, { Component } from 'react';
-import { observer, inject } from 'mobx-react';
+import { observer } from 'mobx-react';
 import {
   Modal, Form, Input, DatePicker,
 } from 'choerodon-ui';
 import moment from 'moment';
-import { Content, stores } from '@choerodon/boot';
-import ReleaseStore from '../../../stores/project/release/ReleaseStore';
-import BacklogStore from '../../../stores/project/backlog/BacklogStore';
+import { stores } from '@choerodon/boot';
+import { versionApi } from '@/api';
 
 const { Sidebar } = Modal;
 const { TextArea } = Input;
@@ -39,7 +38,7 @@ class AddRelease extends Component {
           startDate: values.startDate ? `${moment(values.startDate).format('YYYY-MM-DD')} 00:00:00` : null,
           expectReleaseDate: values.expectReleaseDate ? `${moment(values.expectReleaseDate).format('YYYY-MM-DD')} 00:00:00` : null,
         };
-        ReleaseStore.axiosAddRelease(data).then((res) => {
+        versionApi.create(data).then((res) => {
           form.resetFields();
           onCancel();
           refresh();
@@ -78,7 +77,7 @@ class AddRelease extends Component {
   checkName = (rule, value, callback) => {
     const proId = AppState.currentMenuType.id;
     if (value && value.trim()) {
-      ReleaseStore.axiosCheckName(proId, value.trim()).then((res) => {
+      versionApi.checkName(value.trim()).then((res) => {
         if (res) {
           callback('版本名称重复');
         } else {
@@ -127,6 +126,7 @@ class AddRelease extends Component {
               <DatePicker
                 style={{ width: '100%' }}
                 label="开始日期"
+                placeholder="请选择开始日期"
                 disabledDate={expectReleaseDate
                   ? current => current > moment(expectReleaseDate) : () => false}
                 onChange={(date) => {
@@ -142,6 +142,7 @@ class AddRelease extends Component {
               <DatePicker
                 style={{ width: '100%' }}
                 label="预计发布日期"
+                placeholder="请选择预计发布日期"
                 onChange={(date) => {
                   this.setState({
                     expectReleaseDate: date,

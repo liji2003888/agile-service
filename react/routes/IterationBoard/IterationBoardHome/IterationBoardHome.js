@@ -6,7 +6,7 @@ import {
 import {
   Row, Col, Radio, Tooltip, Icon,
 } from 'choerodon-ui';
-import { loadSprint } from '../../../api/NewIssueApi';
+import { sprintApi } from '@/api';
 import Assignee from '../IterationBoardComponent/Assignee';
 import BurnDown from '../IterationBoardComponent/BurnDown';
 import Sprint from '../IterationBoardComponent/Sprint';
@@ -26,7 +26,6 @@ class IterationBoardHome extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      loading: true,
       sprintId: undefined,
       sprintName: undefined,
     };
@@ -40,11 +39,9 @@ class IterationBoardHome extends Component {
     const { match } = this.props;
     const sprintId = match.params.id;
     if (!sprintId) return;
-    this.setState({ loading: true });
-    loadSprint(sprintId)
+    sprintApi.loadSprint(sprintId)
       .then((res) => {
         this.setState({
-          loading: false,
           sprintId: res.sprintId,
           sprintName: res.sprintName,
         });
@@ -52,8 +49,8 @@ class IterationBoardHome extends Component {
   }
 
   renderContent() {
-    const { loading, sprintId, sprintName } = this.state;
-    if (!loading && !sprintId) {
+    const { sprintId, sprintName } = this.state;
+    if (!sprintId) {
       return (
         <div>
           当前项目下无冲刺
@@ -150,19 +147,10 @@ class IterationBoardHome extends Component {
 
   render() {
     return (
-      <Page 
+      <Page
         className="c7n-agile-iterationBoard"
         service={[
-          'agile-service.sprint.querySprintById',
-          'agile-service.iterative-worktable.querySprintInfo',
-          'agile-service.iterative-worktable.queryStatusCategoryDistribute',
-          'agile-service.sprint.queryNameByOptions',
-          'agile-service.iterative-worktable.queryIssueTypeDistribute',
-          'agile-service.iterative-worktable.queryPriorityDistribute',
-          'agile-service.iterative-worktable.queryAssigneeDistribute',
-          'agile-service.sprint.queryIssueByOptions',
-          'agile-service.sprint.queryNonWorkdays',
-          'agile-service.report.queryBurnDownCoordinate',
+          'choerodon.code.project.cooperation.iteration-plan.ps.report',
         ]}
       >
         <Header title="活跃冲刺" backPath={`/agile/scrumboard?type=project&id=${AppState.currentMenuType.id}&name=${encodeURIComponent(AppState.currentMenuType.name)}&organizationId=${AppState.currentMenuType.organizationId}&orgId=${AppState.currentMenuType.organizationId}`}>

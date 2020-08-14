@@ -6,17 +6,19 @@ import io.choerodon.agile.api.vo.IssueLinkVO;
 import io.choerodon.agile.api.validator.IssueLinkValidator;
 import io.choerodon.agile.app.assembler.IssueLinkAssembler;
 import io.choerodon.agile.app.service.IssueLinkService;
+import io.choerodon.agile.infra.dto.IssueConvertDTO;
 import io.choerodon.agile.infra.dto.IssueLinkDTO;
 import io.choerodon.agile.infra.mapper.IssueLinkMapper;
+import io.choerodon.agile.infra.utils.BaseFieldUtil;
 import io.choerodon.core.exception.CommonException;
+import org.hzero.mybatis.domian.Condition;
+import org.hzero.mybatis.util.Sqls;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
-import org.modelmapper.convention.MatchingStrategies;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,13 +38,8 @@ public class IssueLinkServiceImpl implements IssueLinkService {
     private IssueLinkValidator issueLinkValidator;
     @Autowired
     private IssueLinkAssembler issueLinkAssembler;
-
-    private ModelMapper modelMapper = new ModelMapper();
-
-    @PostConstruct
-    public void init() {
-        modelMapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
-    }
+    @Autowired
+    private ModelMapper modelMapper;
 
     @Override
     public List<IssueLinkVO> createIssueLinkList(List<IssueLinkCreateVO> issueLinkCreateVOList, Long issueId, Long projectId) {
@@ -52,6 +49,7 @@ public class IssueLinkServiceImpl implements IssueLinkService {
             issueLinkValidator.verifyCreateData(issueLinkDTO);
             if (issueLinkValidator.checkUniqueLink(issueLinkDTO)) {
                 create(issueLinkDTO);
+                BaseFieldUtil.updateIssueLastUpdateInfoForIssueLink(issueLinkDTO.getProjectId(), issueLinkDTO);
             }
         });
         return listIssueLinkByIssueId(issueId, projectId, false);
@@ -60,6 +58,8 @@ public class IssueLinkServiceImpl implements IssueLinkService {
 
     @Override
     public void deleteIssueLink(Long issueLinkId) {
+        IssueLinkDTO issueLinkDTO = issueLinkMapper.selectByPrimaryKey(issueLinkId);
+        BaseFieldUtil.updateIssueLastUpdateInfoForIssueLink(issueLinkDTO.getProjectId(), issueLinkDTO);
         delete(issueLinkId);
     }
 
@@ -85,6 +85,7 @@ public class IssueLinkServiceImpl implements IssueLinkService {
 
     @Override
     public int deleteByIssueId(Long issueId) {
+        BaseFieldUtil.updateIssueLastUpdateInfoForALLIssueLink(issueLinkMapper, issueId);
         return issueLinkMapper.deleteByIssueId(issueId);
     }
 
@@ -101,5 +102,11 @@ public class IssueLinkServiceImpl implements IssueLinkService {
         } else {
             return new ArrayList<>();
         }
+    }
+
+    @Override
+    public void deleteIssueLinkByIssueId(IssueConvertDTO issueConvertDTO, List<IssueLinkDTO> issueLinkDTOS) {
+        BaseFieldUtil.updateIssueLastUpdateInfoForIssueLinks(issueConvertDTO, issueLinkDTOS);
+        issueLinkMapper.deleteByIssueId(issueConvertDTO.getIssueId());
     }
 }

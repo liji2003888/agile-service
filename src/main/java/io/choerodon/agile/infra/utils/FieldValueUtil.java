@@ -1,7 +1,12 @@
 package io.choerodon.agile.infra.utils;
 
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.stream.Collectors;
+
 import io.choerodon.agile.api.vo.FieldDataLogCreateVO;
-import io.choerodon.agile.api.vo.FieldValueVO;
 import io.choerodon.agile.api.vo.ObjectSchemeFieldDetailVO;
 import io.choerodon.agile.api.vo.PageFieldViewVO;
 import io.choerodon.agile.app.service.FieldDataLogService;
@@ -13,13 +18,9 @@ import io.choerodon.agile.infra.enums.FieldType;
 import io.choerodon.agile.infra.enums.ObjectSchemeCode;
 import io.choerodon.agile.infra.feign.BaseFeignClient;
 import io.choerodon.agile.infra.mapper.FieldOptionMapper;
-import org.springframework.data.domain.Pageable;
 import io.choerodon.core.exception.CommonException;
-
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.*;
-import java.util.stream.Collectors;
+import io.choerodon.mybatis.pagehelper.domain.PageRequest;
+import org.springframework.util.CollectionUtils;
 
 /**
  * @author shinan.chen
@@ -28,6 +29,10 @@ import java.util.stream.Collectors;
 public class FieldValueUtil {
 
     private static final String DATETIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
+    /**
+     * 匹配 Thu Apr 30 2020 00:00:00 GMT+0800 格式的时间
+     */
+    private static final String ENGLISH_STRING_DATE_FORMAT = "EEE MMM dd yyyy HH:mm:ss 'GMT'Z";
     private static final String DATE_FORMAT = "yyyy-MM-dd";
     private static final String TIME_FORMAT = "HH:mm:ss";
     private static final String DATE_VALUE = "date_value";
@@ -54,7 +59,7 @@ public class FieldValueUtil {
      * @param fieldType
      * @param values
      */
-    public static void handleDTO2Value(PageFieldViewVO view, String fieldType, List<FieldValueVO> values, Map<Long, UserDTO> userMap, Boolean isJustStr) {
+    public static void handleDTO2Value(PageFieldViewVO view, String fieldType, List<FieldValueDTO> values, Map<Long, UserDTO> userMap, Boolean isJustStr) {
         Object valueStr = null;
         Object value = null;
         if (values != null && !values.isEmpty()) {
@@ -62,14 +67,14 @@ public class FieldValueUtil {
             switch (fieldType) {
                 case FieldType.CHECKBOX:
                 case FieldType.MULTIPLE:
-                    values.stream().map(FieldValueVO::getOptionId).collect(Collectors.toList()).toArray(longValues);
-                    value = longValues;
-                    valueStr = values.stream().map(FieldValueVO::getOptionValue).collect(Collectors.joining(", "));
+                    values.stream().map(FieldValueDTO::getOptionId).collect(Collectors.toList()).toArray(longValues);
+                    value = EncryptionUtils.encryptList(Arrays.asList(longValues));
+                    valueStr = values.stream().map(FieldValueDTO::getOptionValue).collect(Collectors.joining(", "));
                     break;
                 case FieldType.RADIO:
                 case FieldType.SINGLE:
                     //单选款/选择器（单选）获取为Long
-                    value = values.get(0).getOptionId();
+                    value = EncryptionUtils.encrypt(values.get(0).getOptionId());
                     valueStr = values.get(0).getOptionValue();
                     break;
                 case FieldType.DATETIME:
@@ -123,6 +128,8 @@ public class FieldValueUtil {
                     } else {
                         valueStr = userMap.getOrDefault(value, new UserDTO());
                     }
+                    // 用户id加密
+                    value = EncryptionUtils.encrypt(values.get(0).getOptionId());
                     break;
                 default:
                     break;
@@ -149,7 +156,7 @@ public class FieldValueUtil {
                 case FieldType.RADIO:
                 case FieldType.SINGLE:
                     if (view.getDefaultValue() != null && !"".equals(view.getDefaultValue())) {
-                        view.setDefaultValue(Long.valueOf(String.valueOf(view.getDefaultValue())));
+                        view.setDefaultValue(EncryptionUtils.encrypt(Long.valueOf(String.valueOf(view.getDefaultValue()))));
                     }
                     break;
                 case FieldType.DATETIME:
@@ -169,7 +176,7 @@ public class FieldValueUtil {
                 case FieldType.MEMBER:
                     if (view.getDefaultValue() != null && !"".equals(view.getDefaultValue())) {
                         Long defaultValue = Long.valueOf(String.valueOf(view.getDefaultValue()));
-                        view.setDefaultValue(defaultValue);
+                        view.setDefaultValue(EncryptionUtils.encrypt(defaultValue));
                         view.setDefaultValueObj(userMap.getOrDefault(defaultValue, new UserDTO()));
                     }
                     break;
@@ -192,9 +199,9 @@ public class FieldValueUtil {
         if (defaultValue != null && !"".equals(defaultValue)) {
             String[] defaultIdStrs = String.valueOf(defaultValue).split(",");
             if (defaultIdStrs != null) {
-                Long[] defaultIds = new Long[defaultIdStrs.length];
+                String[] defaultIds = new String[defaultIdStrs.length];
                 for (int i = 0; i < defaultIdStrs.length; i++) {
-                    defaultIds[i] = Long.valueOf(defaultIdStrs[i]);
+                    defaultIds[i] = EncryptionUtils.encrypt(Long.valueOf(defaultIdStrs[i]));
                 }
                 view.setDefaultValue(defaultIds);
             }
@@ -223,6 +230,7 @@ public class FieldValueUtil {
                 BaseFeignClient baseFeignClient = SpringBeanUtil.getBean(BaseFeignClient.class);
                 if (fieldDetail.getDefaultValue() != null && !"".equals(fieldDetail.getDefaultValue())) {
                     Long defaultValue = Long.valueOf(String.valueOf(fieldDetail.getDefaultValue()));
+                    fieldDetail.setDefaultValue(EncryptionUtils.encrypt(defaultValue));
                     List<UserDTO> list = baseFeignClient.listUsersByIds(Arrays.asList(defaultValue).toArray(new Long[1]), false).getBody();
                     if (!list.isEmpty()) {
                         fieldDetail.setDefaultValueObj(list.get(0));
@@ -273,10 +281,7 @@ public class FieldValueUtil {
                     case FieldType.DATETIME:
                     case FieldType.DATE:
                     case FieldType.TIME:
-                        DateFormat df = new SimpleDateFormat(DATETIME_FORMAT);
-                        Date dateValue = df.parse(defaultValue);
-                        fieldValue.setDateValue(dateValue);
-                        fieldValues.add(fieldValue);
+                        convertDate(fieldValues, defaultValue, fieldValue);
                         break;
                     case FieldType.INPUT:
                         fieldValue.setStringValue(defaultValue);
@@ -294,9 +299,24 @@ public class FieldValueUtil {
                         break;
                 }
             } catch (Exception e) {
-                throw new CommonException(e.getMessage());
+                throw new CommonException("error.date.parse", e);
             }
         }
+    }
+
+    private static void convertDate(List<FieldValueDTO> fieldValues, String defaultValue, FieldValueDTO fieldValue) throws ParseException {
+        Date dateValue;
+        //兼容Thu Apr 30 2020 00:00:00 GMT+0800和2020-02-13 15:51:22格式的日期
+        try {
+            DateFormat df = new SimpleDateFormat(ENGLISH_STRING_DATE_FORMAT, Locale.ENGLISH);
+            dateValue = df.parse(defaultValue);
+        } catch (ParseException e) {
+            DateFormat df = new SimpleDateFormat(DATETIME_FORMAT);
+            //yyyy-MM-dd HH:mm:ss格式转换失败，直接抛出异常
+            dateValue = df.parse(defaultValue);
+        }
+        fieldValue.setDateValue(dateValue);
+        fieldValues.add(fieldValue);
     }
 
     /**
@@ -313,10 +333,10 @@ public class FieldValueUtil {
                 switch (fieldType) {
                     case FieldType.CHECKBOX:
                     case FieldType.MULTIPLE:
-                        List<Integer> optionIds = (List<Integer>) value;
-                        for (Integer optionId : optionIds) {
+                        List<String> optionIds = (List<String>) value;
+                        for (String optionId : optionIds) {
                             FieldValueDTO oValue = new FieldValueDTO();
-                            oValue.setOptionId(Long.parseLong(String.valueOf(optionId)));
+                            oValue.setOptionId(EncryptionUtils.decrypt(optionId, EncryptionUtils.BLANK_KEY));
                             fieldValues.add(oValue);
                         }
                         break;
@@ -324,17 +344,14 @@ public class FieldValueUtil {
                     case FieldType.SINGLE:
                     case FieldType.MEMBER:
                         //人员/单选款/选择器（单选）处理为Long
-                        Long optionId = Long.parseLong(value.toString());
+                        Long optionId = EncryptionUtils.decrypt(value.toString(), EncryptionUtils.BLANK_KEY);
                         fieldValue.setOptionId(optionId);
                         fieldValues.add(fieldValue);
                         break;
                     case FieldType.DATETIME:
                     case FieldType.DATE:
                     case FieldType.TIME:
-                        DateFormat df = new SimpleDateFormat(DATETIME_FORMAT);
-                        Date dateValue = df.parse(value.toString());
-                        fieldValue.setDateValue(dateValue);
-                        fieldValues.add(fieldValue);
+                        convertDate(fieldValues, value.toString(), fieldValue);
                         break;
                     case FieldType.INPUT:
                         String stringValue = (String) value;
@@ -355,7 +372,7 @@ public class FieldValueUtil {
                         break;
                 }
             } catch (Exception e) {
-                throw new CommonException(e.getMessage());
+                throw new CommonException("error.date.parse", e);
             }
         }
     }
@@ -497,12 +514,12 @@ public class FieldValueUtil {
                     break;
             }
         } catch (Exception e) {
-            throw new CommonException(e.getMessage());
+            throw new CommonException("error", e);
         }
         fieldDataLogService.createDataLog(projectId, ObjectSchemeCode.AGILE_ISSUE, create);
     }
 
-    public static void handleAgileSortPageRequest(String fieldCode, String fieldType, Pageable pageable) {
+    public static void handleAgileSortPageRequest(String fieldCode, String fieldType, PageRequest pageRequest) {
         try {
             switch (fieldType) {
                 case FieldType.DATETIME:
@@ -510,13 +527,145 @@ public class FieldValueUtil {
                 case FieldType.TIME:
                     Map<String, String> order = new HashMap<>(1);
                     order.put(fieldCode, DATE_VALUE);
-                    PageUtil.sortResetOrder(pageable.getSort(), "fv", order);
+                    PageUtil.sortResetOrder(pageRequest.getSort(), "fv", order);
                     break;
                 default:
                     break;
             }
         } catch (Exception e) {
-            throw new CommonException(e.getMessage());
+            throw new CommonException("error", e);
         }
     }
+
+    public static List<FieldDataLogCreateVO> batchHandlerFiledLog(Long projectId,Long instanceId,List<FieldValueDTO> oldFieldValues, List<FieldValueDTO> newFieldValues){
+        List<FieldDataLogCreateVO> list = new ArrayList<>();
+        Map<Long, List<FieldValueDTO>> oldFieldMap = new HashMap<>();
+        if(!CollectionUtils.isEmpty(oldFieldValues)){
+            oldFieldMap.putAll(oldFieldValues.stream().collect(Collectors.groupingBy(FieldValueDTO::getFieldId)));
+        }
+        Map<Long, List<FieldValueDTO>> newFieldMap = new HashMap<>();
+        if(!CollectionUtils.isEmpty(newFieldValues)){
+            newFieldMap.putAll(newFieldValues.stream().collect(Collectors.groupingBy(FieldValueDTO::getFieldId)));
+        }
+        Iterator<Map.Entry<Long, List<FieldValueDTO>>> it = newFieldMap.entrySet().iterator();
+        Long organizationId = ConvertUtil.getOrganizationId(projectId);
+        while (it.hasNext()){
+            Map.Entry<Long, List<FieldValueDTO>> next = it.next();
+            List<FieldValueDTO> oldValue =CollectionUtils.isEmpty(oldFieldMap.get(next.getKey())) ? new ArrayList<>() : oldFieldMap.get(next.getKey());
+            List<FieldValueDTO> value = next.getValue();
+            if(!CollectionUtils.isEmpty(value)){
+                FieldDataLogCreateVO fieldDataLogCreateVO = new FieldDataLogCreateVO();
+                fieldDataLogCreateVO.setFieldId(next.getKey());
+                fieldDataLogCreateVO.setInstanceId(instanceId);
+                batchHandlerFiled(fieldDataLogCreateVO,organizationId,value.get(0).getFieldType(),oldValue,value);
+                list.add(fieldDataLogCreateVO);
+            }
+        }
+        return list;
+    }
+    public static void batchHandlerFiled(FieldDataLogCreateVO create,Long organizationId,String fieldType, List<FieldValueDTO> oldFieldValues, List<FieldValueDTO> newFieldValues){
+        FieldOptionMapper fieldOptionMapper = SpringBeanUtil.getBean(FieldOptionMapper.class);
+        try {
+            switch (fieldType) {
+                case FieldType.CHECKBOX:
+                case FieldType.MULTIPLE:
+                    if (!oldFieldValues.isEmpty()) {
+                        create.setOldValue(oldFieldValues.stream().map(x -> String.valueOf(x.getOptionId())).collect(Collectors.joining(",")));
+                        create.setOldString(oldFieldValues.stream().map(FieldValueDTO::getOptionValue).collect(Collectors.joining(",")));
+                    }
+                    if (!newFieldValues.isEmpty()) {
+                        List<Long> newOptionIds = newFieldValues.stream().map(FieldValueDTO::getOptionId).collect(Collectors.toList());
+                        create.setNewValue(newOptionIds.stream().map(x -> String.valueOf(x)).collect(Collectors.joining(",")));
+                        create.setNewString(fieldOptionMapper.selectByOptionIds(organizationId, newOptionIds).stream().map(FieldOptionDTO::getValue).collect(Collectors.joining(",")));
+                    }
+                    break;
+                case FieldType.RADIO:
+                case FieldType.SINGLE:
+                    if (!oldFieldValues.isEmpty()) {
+                        create.setOldValue(String.valueOf(oldFieldValues.get(0).getOptionId()));
+                        create.setOldString(String.valueOf(oldFieldValues.get(0).getOptionValue()));
+                    }
+                    if (!newFieldValues.isEmpty()) {
+                        List<Long> newOptionIds = Arrays.asList(newFieldValues.get(0).getOptionId());
+                        List<FieldOptionDTO> fieldOptions = fieldOptionMapper.selectByOptionIds(organizationId, newOptionIds);
+                        create.setNewValue(String.valueOf(newFieldValues.get(0).getOptionId()));
+                        if (!fieldOptions.isEmpty()) {
+                            create.setNewString(fieldOptions.get(0).getValue());
+                        }
+                    }
+                    break;
+                case FieldType.DATETIME:
+                    DateFormat df1 = new SimpleDateFormat(DATETIME_FORMAT);
+                    if (!oldFieldValues.isEmpty()) {
+                        create.setOldString(df1.format(oldFieldValues.get(0).getDateValue()));
+                    }
+                    if (!newFieldValues.isEmpty()) {
+                        create.setNewString(df1.format(newFieldValues.get(0).getDateValue()));
+                    }
+                    break;
+                case FieldType.DATE:
+                    DateFormat df3 = new SimpleDateFormat(DATE_FORMAT);
+                    if (!oldFieldValues.isEmpty()) {
+                        create.setOldString(df3.format(oldFieldValues.get(0).getDateValue()));
+                    }
+                    if (!newFieldValues.isEmpty()) {
+                        create.setNewString(df3.format(newFieldValues.get(0).getDateValue()));
+                    }
+                    break;
+                case FieldType.TIME:
+                    DateFormat df2 = new SimpleDateFormat(DATETIME_FORMAT);
+                    if (!oldFieldValues.isEmpty()) {
+                        create.setOldString(df2.format(oldFieldValues.get(0).getDateValue()));
+                    }
+                    if (!newFieldValues.isEmpty()) {
+                        create.setNewString(df2.format(newFieldValues.get(0).getDateValue()));
+                    }
+                    break;
+                case FieldType.INPUT:
+                    if (!oldFieldValues.isEmpty()) {
+                        create.setOldString(oldFieldValues.get(0).getStringValue());
+                    }
+                    if (!newFieldValues.isEmpty()) {
+                        create.setNewString(newFieldValues.get(0).getStringValue());
+                    }
+                    break;
+                case FieldType.NUMBER:
+                    if (!oldFieldValues.isEmpty()) {
+                        create.setOldString(oldFieldValues.get(0).getNumberValue());
+                    }
+                    if (!newFieldValues.isEmpty()) {
+                        create.setNewString(newFieldValues.get(0).getNumberValue());
+                    }
+                    break;
+                case FieldType.TEXT:
+                    if (!oldFieldValues.isEmpty()) {
+                        create.setOldString(oldFieldValues.get(0).getTextValue());
+                    }
+                    if (!newFieldValues.isEmpty()) {
+                        create.setNewString(newFieldValues.get(0).getTextValue());
+                    }
+                    break;
+                case FieldType.MEMBER:
+                    //查询用户
+                    List<Long> userIds = oldFieldValues.stream().map(FieldValueDTO::getOptionId).collect(Collectors.toList());
+                    userIds.addAll(newFieldValues.stream().map(FieldValueDTO::getOptionId).collect(Collectors.toList()));
+                    Map<Long, UserDTO> userMap = handleUserMap(userIds);
+                    if (!oldFieldValues.isEmpty()) {
+                        create.setOldValue(String.valueOf(oldFieldValues.get(0).getOptionId()));
+                        create.setOldString(userMap.getOrDefault(oldFieldValues.get(0).getOptionId(), new UserDTO()).getRealName());
+                    }
+                    if (!newFieldValues.isEmpty()) {
+                        create.setNewValue(String.valueOf(newFieldValues.get(0).getOptionId()));
+                        create.setNewString(userMap.getOrDefault(newFieldValues.get(0).getOptionId(), new UserDTO()).getRealName());
+                    }
+                    break;
+                default:
+                    break;
+            }
+        } catch (Exception e) {
+            throw new CommonException("error.batch.handle.fields", e);
+        }
+    }
+
+
 }

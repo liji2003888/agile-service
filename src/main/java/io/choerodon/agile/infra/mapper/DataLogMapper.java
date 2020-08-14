@@ -6,7 +6,7 @@ import io.choerodon.agile.infra.dto.DataLogDTO;
 import io.choerodon.agile.infra.dto.DataLogStatusChangeDTO;
 import io.choerodon.agile.infra.dto.IssueDTO;
 import io.choerodon.agile.infra.dto.ProductVersionDTO;
-import io.choerodon.mybatis.common.Mapper;
+import io.choerodon.mybatis.common.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.Date;
@@ -18,7 +18,7 @@ import java.util.Set;
  * Email: fuqianghuang01@gmail.com
  */
 
-public interface DataLogMapper extends Mapper<DataLogDTO> {
+public interface DataLogMapper extends BaseMapper<DataLogDTO> {
 
     List selectByIssueId(@Param("projectId") Long projectId,
                          @Param("issueId") Long issueId);
@@ -80,4 +80,10 @@ public interface DataLogMapper extends Mapper<DataLogDTO> {
                                                 @Param("oldPriorityName") String oldPriorityName, @Param("newPriorityName") String newPriorityName);
 
     List<DataLogFixVO> queryListByProjectId(Long projectId);
+
+    List<DataLogDTO> selectResolutionIssueBySprint(@Param("projectId") Long projectId,
+                                  @Param("issueIdList") Set<Long> issueIdList,
+                                  @Param("field") String field,
+                                  @Param("startDate") Date startDate,
+                                  @Param("endDate") Date endDate);
 }

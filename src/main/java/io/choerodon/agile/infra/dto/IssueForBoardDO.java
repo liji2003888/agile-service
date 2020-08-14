@@ -3,6 +3,8 @@ package io.choerodon.agile.infra.dto;
 import io.choerodon.agile.api.vo.IssueTypeVO;
 import io.choerodon.agile.api.vo.PriorityVO;
 
+import org.hzero.starter.keyencrypt.core.Encrypt;
+
 import java.util.Date;
 
 /**
@@ -11,6 +13,7 @@ import java.util.Date;
  */
 public class IssueForBoardDO {
 
+    @Encrypt
     private Long issueId;
 
     private String issueNum;
@@ -19,10 +22,12 @@ public class IssueForBoardDO {
 
     private String summary;
 
+    @Encrypt(ignoreValue = "0")
     private Long parentIssueId;
 
     private Long objectVersionNumber;
 
+    @Encrypt
     private Long assigneeId;
 
     private String assigneeName;
@@ -33,10 +38,16 @@ public class IssueForBoardDO {
 
     private String imageUrl;
 
+    private String email;
+
+    private Boolean ldap;
+
+    @Encrypt(ignoreValue = "0")/*(EncryptionConstant.AGILE_ISSUE)*/
     private Long epicId;
 
     private String rank;
 
+    @Encrypt
     private Long priorityId;
 
     private Date stayDate;
@@ -45,6 +56,7 @@ public class IssueForBoardDO {
 
     private PriorityVO priorityVO;
 
+    @Encrypt
     private Long issueTypeId;
 
     private IssueTypeVO issueTypeVO;
@@ -52,7 +64,7 @@ public class IssueForBoardDO {
     private String featureType;
 
 //    private Long piId;
-
+    @Encrypt(ignoreValue = "0")/*(EncryptionConstant.AGILE_ISSUE)*/
     private Long relateIssueId;
 
     public String getRank() {
@@ -229,5 +241,21 @@ public class IssueForBoardDO {
 
     public Long getRelateIssueId() {
         return relateIssueId;
+    }
+
+    public Boolean getLdap() {
+        return ldap;
+    }
+
+    public void setLdap(Boolean ldap) {
+        this.ldap = ldap;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 }

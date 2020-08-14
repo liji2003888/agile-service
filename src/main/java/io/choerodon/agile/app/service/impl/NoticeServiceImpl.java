@@ -1,6 +1,9 @@
 package io.choerodon.agile.app.service.impl;
 
-import com.github.pagehelper.PageInfo;
+import io.choerodon.agile.infra.dto.UserDTO;
+import io.choerodon.agile.infra.feign.BaseFeignClient;
+import io.choerodon.agile.infra.feign.NotifyFeignClient;
+import io.choerodon.core.domain.Page;
 import io.choerodon.agile.api.vo.*;
 import io.choerodon.agile.app.assembler.NoticeMessageAssembler;
 import io.choerodon.agile.app.service.NoticeService;
@@ -123,19 +126,10 @@ public class NoticeServiceImpl implements NoticeService {
 
     private void addUsersByProjectOwner(Long projectId, List<String> res, List<Long> result) {
         if (res.contains("projectOwner")) {
-            RoleAssignmentSearchVO roleAssignmentSearchVO = new RoleAssignmentSearchVO();
-            Long roleId = null;
-            List<RoleVO> roleVOS = userService.listRolesWithUserCountOnProjectLevel(projectId, roleAssignmentSearchVO);
-            for (RoleVO roleVO : roleVOS) {
-                if ("role/project/default/project-owner".equals(roleVO.getCode())) {
-                    roleId = roleVO.getId();
-                    break;
-                }
-            }
-            if (roleId != null) {
-                PageInfo<UserVO> userDTOS = userService.pagingQueryUsersByRoleIdOnProjectLevel(0, 300,roleId, projectId, roleAssignmentSearchVO);
-                for (UserVO userVO : userDTOS.getList()) {
-                    if (!result.contains(userVO.getId())) {
+            List<UserVO> userDTOS = userService.listProjectAdminUsersByProjectId(projectId);
+            if(!CollectionUtils.isEmpty(userDTOS)){
+                for (UserVO userVO:userDTOS) {
+                    if(!result.contains(userVO.getId())){
                         result.add(userVO.getId());
                     }
                 }

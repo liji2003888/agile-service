@@ -1,7 +1,9 @@
 package io.choerodon.agile.api.vo;
 
-import io.choerodon.mybatis.entity.BaseDTO;
+
+import io.choerodon.mybatis.domain.AuditDomain;
 import io.swagger.annotations.ApiModelProperty;
+import org.hzero.starter.keyencrypt.core.Encrypt;
 
 import javax.validation.constraints.NotNull;
 
@@ -9,8 +11,9 @@ import javax.validation.constraints.NotNull;
  * @author shinan.chen
  * @since 2019/4/1
  */
-public class FieldOptionUpdateVO extends BaseDTO {
+public class FieldOptionUpdateVO extends AuditDomain {
     @ApiModelProperty(value = "字段选项id")
+    @Encrypt
     private Long id;
     @ApiModelProperty(value = "选项值编码")
     @NotNull(message = "error.fieldOption.codeNotNull")
@@ -19,6 +22,7 @@ public class FieldOptionUpdateVO extends BaseDTO {
     @NotNull(message = "error.fieldOption.valueNotNull")
     private String value;
     @ApiModelProperty(value = "父选项id")
+    @Encrypt
     private Long parentId;
     @ApiModelProperty(value = "是否启用")
     @NotNull(message = "error.fieldOption.enabledNotNull")

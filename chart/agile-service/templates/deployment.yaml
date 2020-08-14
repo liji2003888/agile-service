@@ -4,7 +4,9 @@ metadata:
   name: {{ .Release.Name }}
   labels:
 {{ include "service.labels.standard" . | indent 4 }}
+{{- if .Values.logs.enabled }}
 {{ include "service.logging.deployment.label" . | indent 4 }}
+{{- end }}
 spec:
   strategy:
     type: {{ .Values.deploymentUpdate.type }}
@@ -39,11 +41,11 @@ spec:
       initContainers:
       - name: skywalking-agent
         image: {{ .Values.plugins.skywalkingAgentImage }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
         command:
         - sh
         - -c
-        - cp -rf /skywalking/agent/* /agent
+        - cp -rfp /skywalking/agent/* /agent
         volumeMounts:
         - name: skywalking-agent
           mountPath: /agent

@@ -1,7 +1,8 @@
 package io.choerodon.agile.app.service;
 
+import com.alibaba.fastjson.JSONObject;
 import io.choerodon.agile.api.vo.*;
-import org.springframework.data.domain.Pageable;
+import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 
 import java.util.List;
 
@@ -75,8 +76,26 @@ public interface FieldValueService {
      *
      * @param organizationId
      * @param projectId
-     * @param pageable
+     * @param pageRequest
      * @return
      */
-    List<Long> sortIssueIdsByFieldValue(Long organizationId, Long projectId, Pageable pageable);
+    List<Long> sortIssueIdsByFieldValue(Long organizationId, Long projectId, PageRequest pageRequest);
+
+
+    /**
+     * 批量处理自定义字段的值
+     * @param projectId
+     * @param customFields
+     * @param schemeCode
+     * @param issueIds
+     */
+    void handlerCustomFields(Long projectId, List<PageFieldViewUpdateVO> customFields, String schemeCode, List<Long> issueIds,BatchUpdateFieldStatusVO batchUpdateFieldStatusVO);
+
+    /**
+     * 批量处理预定义字段值
+     * @param projectId
+     * @param issueIds
+     * @param predefinedFields
+     */
+    void handlerPredefinedFields(Long projectId, List<Long> issueIds, JSONObject predefinedFields,BatchUpdateFieldStatusVO batchUpdateFieldStatusVO,String applyType);
 }

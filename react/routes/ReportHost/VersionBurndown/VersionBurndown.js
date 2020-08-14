@@ -8,8 +8,7 @@ import {
 import {
   Button, Tabs, Table, Select, Icon, Tooltip, Spin, Checkbox,
 } from 'choerodon-ui';
-// import pic from './no_version.svg';
-// import finish from './legend/finish.svg';
+import STATUS from '@/constants/STATUS';
 import pic from '../../../assets/image/emptyChart.svg';
 import SwithChart from '../Component/switchChart';
 import StatusTag from '../../../components/StatusTag';
@@ -24,7 +23,6 @@ import sprintIcon from './sprintIcon.svg';
 import storyPointIcon from './storyPointIcon.svg';
 import completed from './completed.svg';
 import './VersionReport.less';
-import { STATUS } from '../../../common/Constant';
 
 const { AppState } = stores;
 const { Option } = Select;
@@ -426,7 +424,7 @@ class VersionBurndown extends Component {
               onClick={() => {
                 const { history } = this.props;
                 const urlParams = AppState.currentMenuType;
-                history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramName=${issueNum}&paramIssueId=${record.issueId}&paramUrl=reporthost/VersionBurndown`);
+                history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramName=${issueNum}&paramIssueId=${encodeURIComponent(record.issueId)}&paramUrl=reporthost/VersionBurndown`);
               }}
             >
               {issueNum}
@@ -489,7 +487,6 @@ class VersionBurndown extends Component {
               <Tooltip mouseEnterDelay={0.5} title={`任务状态:${record.statusVO.name}`}>
                 <div>
                   <StatusTag
-                    inTable
                     style={{ display: 'inline-block', minWidth: 50 }}
                     name={record.statusVO.name}
                     color={STATUS[record.statusVO.type]}
@@ -577,7 +574,7 @@ class VersionBurndown extends Component {
           <div style={{ textAlign: 'left', marginLeft: '50px' }}>
             <span style={{ fontSize: 12, color: 'rgba(0, 0, 0, 0.65)' }}>报表不能显示</span>
             <p style={{ marginTop: 10, fontSize: 20 }}>
-              {'在此版本中没有预估的故事，请在'}
+              在此版本中没有预估的故事，请在
               <a
                 role="none"
                 onClick={() => {
@@ -586,9 +583,9 @@ class VersionBurndown extends Component {
                   history.push(`/agile/work-list/backlog?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramUrl=reporthost/VersionBurndown`);
                 }}
               >
-                {'待办事项'}
+                待办事项
               </a>
-              {'中创建故事并预估故事点。'}
+              中创建故事并预估故事点。
             </p>
           </div>
         </div>
@@ -601,7 +598,7 @@ class VersionBurndown extends Component {
             ES.reload ? null : (
               <div style={{ position: 'relative' }}>
                 <div className="c7n-chart-yaxixName">
-                  {'故事点'}
+                  故事点
                 </div>
                 <ReactEcharts
                   ref={(e) => { this.echarts_react = e; }}
@@ -848,7 +845,7 @@ class VersionBurndown extends Component {
     const { checkbox, tabActiveKey, linkFromParamUrl } = this.state;
     const urlParams = AppState.currentMenuType;
     return (
-      <Page className="c7n-versionBurndown">
+      <Page className="c7n-versionBurndown" service={['choerodon.code.project.operation.chart.ps.choerodon.code.project.operation.chart.ps.versionburndown']}>
         <Header
           title="版本燃耗图"
           // backPath={`/agile/${linkFromParamUrl || 'reporthost'}?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}`}
@@ -952,41 +949,41 @@ class VersionBurndown extends Component {
                 </Tabs>
               </div>
             ) : (
-                <EmptyBlock
-                  style={{ marginTop: 40 }}
-                  textWidth="auto"
-                  pic={pic}
-                  title="当前项目无可用版本"
-                  des={(
-                    // eslint-disable-next-line react/jsx-indent
-                    <div>
-                      <span>请在</span>
-                      <span
-                        className="primary"
-                        style={{ margin: '0 5px', cursor: 'pointer' }}
-                        role="none"
-                        onClick={() => {
-                          history.push(`/agile/work-list/backlog?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramUrl=reporthost/VersionBurndown`);
-                        }}
-                      >
-                        {'待办事项'}
-                      </span>
-                      <span>或</span>
-                      <span
-                        className="primary"
-                        style={{ margin: '0 5px', cursor: 'pointer' }}
-                        role="none"
-                        onClick={() => {
-                          history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramUrl=reporthost/VersionBurndown`);
-                        }}
-                      >
-                        {'问题管理'}
-                      </span>
-                      <span>中创建一个版本</span>
-                    </div>
-                  )}
-                />
-              )
+              <EmptyBlock
+                style={{ marginTop: 40 }}
+                textWidth="auto"
+                pic={pic}
+                title="当前项目无可用版本"
+                des={(
+                  // eslint-disable-next-line react/jsx-indent
+                  <div>
+                    <span>请在</span>
+                    <span
+                      className="primary"
+                      style={{ margin: '0 5px', cursor: 'pointer' }}
+                      role="none"
+                      onClick={() => {
+                        history.push(`/agile/work-list/backlog?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramUrl=reporthost/VersionBurndown`);
+                      }}
+                    >
+                      待办事项
+                    </span>
+                    <span>或</span>
+                    <span
+                      className="primary"
+                      style={{ margin: '0 5px', cursor: 'pointer' }}
+                      role="none"
+                      onClick={() => {
+                        history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramUrl=reporthost/VersionBurndown`);
+                      }}
+                    >
+                      问题管理
+                    </span>
+                    <span>中创建一个版本</span>
+                  </div>
+                )}
+              />
+            )
           }
 
         </Content>

@@ -16,3 +16,6 @@ export FieldPI from './FieldPI';
 export FieldText from './FieldText';
 export FieldSummary from './FieldSummary';
 export FieldInput from './FieldInput';
+export FieldWSJFDTO from './FieldWSJFDTO';
+export FieldTeam from './FieldTeam';
+export FieldProgramSprint from './FieldProgramSprint';

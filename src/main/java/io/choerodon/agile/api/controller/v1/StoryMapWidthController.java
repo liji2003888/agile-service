@@ -2,12 +2,13 @@ package io.choerodon.agile.api.controller.v1;
 
 import io.choerodon.agile.api.vo.StoryMapWidthVO;
 import io.choerodon.agile.app.service.StoryMapWidthService;
-import io.choerodon.core.annotation.Permission;
-import io.choerodon.core.enums.ResourceType;
+import io.choerodon.core.iam.ResourceLevel;
+import io.choerodon.swagger.annotation.Permission;
 import io.choerodon.core.exception.CommonException;
 import io.choerodon.core.iam.InitRoleCode;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +27,7 @@ public class StoryMapWidthController {
     @Autowired
     private StoryMapWidthService storyMapWidthService;
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_OWNER, InitRoleCode.PROJECT_MEMBER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("创建故事地图列宽度")
     @PostMapping
     public ResponseEntity<StoryMapWidthVO> create(@ApiParam(value = "项目id", required = true)
@@ -38,7 +39,7 @@ public class StoryMapWidthController {
                 .orElseThrow(() -> new CommonException("error.storyMapWidth.create"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_OWNER, InitRoleCode.PROJECT_MEMBER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("更新故事地图列宽度")
     @PutMapping
     public ResponseEntity<StoryMapWidthVO> update(@ApiParam(value = "项目id", required = true)

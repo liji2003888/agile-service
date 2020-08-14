@@ -1,11 +1,12 @@
 import React, {
   createContext, useMemo, useEffect, useState, 
 } from 'react';
+import { set } from 'mobx';
 import { DataSet } from 'choerodon-ui/pro';
 import { inject } from 'mobx-react';
-import { axios } from '@choerodon/boot';
 import { injectIntl } from 'react-intl';
-import { getFoundationHeader } from '@/api/NewIssueApi';
+import { fieldApi } from '@/api';
+import IssueStore from '@/stores/project/issue/IssueStore';
 import IssueDataSet from './IssueDataSet';
 
 const Store = createContext();
@@ -19,7 +20,7 @@ export const StoreProvider = inject('AppState')(injectIntl(
     const [fields, setFields] = useState([]);
     useEffect(() => {
       const loadData = async () => {
-        const Fields = await getFoundationHeader();
+        const Fields = await fieldApi.getFoundationHeader();
         setFields(Fields);
       };
       loadData();
@@ -28,6 +29,7 @@ export const StoreProvider = inject('AppState')(injectIntl(
     const dataSet = useMemo(() => new DataSet(IssueDataSet({
       intl, projectId, organizationId,
     })), []);
+    IssueStore.dataSet = dataSet;
     /**
     * detail data
     * 详情页数据

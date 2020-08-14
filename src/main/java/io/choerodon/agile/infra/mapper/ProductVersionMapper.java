@@ -3,7 +3,7 @@ package io.choerodon.agile.infra.mapper;
 import io.choerodon.agile.api.vo.SearchVO;
 import io.choerodon.agile.api.vo.TestVersionFixVO;
 import io.choerodon.agile.infra.dto.*;
-import io.choerodon.mybatis.common.Mapper;
+import io.choerodon.mybatis.common.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.Date;
@@ -13,7 +13,7 @@ import java.util.Map;
 /**
  * Created by jian_zhang02@163.com on 2018/5/14.
  */
-public interface ProductVersionMapper extends Mapper<ProductVersionDTO> {
+public interface ProductVersionMapper extends BaseMapper<ProductVersionDTO> {
 
     List queryVersionIdsByProjectId(@Param("projectId") Long projectId,
                                     @Param("searchArgs") Map<String, Object> searchArgs,
@@ -31,15 +31,6 @@ public interface ProductVersionMapper extends Mapper<ProductVersionDTO> {
 
     List<IssueDTO> queryIssueByVersionIdAndStatusCode(@Param("projectId") Long projectId, @Param("versionId") Long versionId, @Param("statusCode") String statusCode, @Param("filterStatusIds") List<Long> filterStatusIds, @Param("searchVO") SearchVO searchVO);
 
-    /**
-     * 根据版本名称和项目id返回版本id
-     *
-     * @param name      name
-     * @param projectId projectId
-     * @return Long
-     */
-    Long queryVersionIdByNameAndProjectId(@Param("name") String name, @Param("projectId") Long projectId);
-
     List<IssueCountDTO> queryIssueCount(@Param("projectId") Long projectId, @Param("versionIds") List<Long> versionIds, @Param("statusIds") List<Long> statusIds);
 
     List<IssueCountDTO> queryNotEstimate(@Param("projectId") Long projectId, @Param("versionIds") List<Long> productVersionIds);
@@ -54,8 +45,6 @@ public interface ProductVersionMapper extends Mapper<ProductVersionDTO> {
 
     int releaseVersion(@Param("projectId") Long projectId, @Param("versionId") Long versionId, @Param("releaseDate") Date releaseDate);
 
-    int queryIssueCountByRelationType(@Param("projectId") Long projectId, @Param("versionId") Long versionId, @Param("relationType") String relationType);
-
     int queryIssueCountByApplyType(@Param("projectId") Long projectId, @Param("versionId") Long versionId, @Param("applyType") String applyType);
 
     List<ProductVersionNameDTO> queryVersionNames(@Param("projectId") Long projectId, @Param("versionId") Long versionId);
@@ -67,8 +56,6 @@ public interface ProductVersionMapper extends Mapper<ProductVersionDTO> {
     List<ProductVersionNameDTO> queryNameByOptions(@Param("projectId") Long projectId, @Param("statusCodes") List<String> statusCodes);
 
     List<ProductVersionCommonDTO> listByProjectId(@Param("projectId") Long projectId);
-
-    List<VersionIssueDTO> queryIssueByVersionIds(@Param("projectId") Long projectId, @Param("versionIds") List<Long> versionIds, @Param("targetVersionId") Long targetVersionId);
 
     int deleteByVersionIds(@Param("projectId") Long projectId, @Param("versionIds") List<Long> versionIds);
 

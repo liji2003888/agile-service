@@ -1,21 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { Button, Icon } from 'choerodon-ui';
 import { observer } from 'mobx-react-lite';
+import { text2Delta, beforeTextUpload } from '@/utils/richText';
+import { issueCommentApi } from '@/api/IssueComment';
 import WYSIWYGEditor from '../../../WYSIWYGEditor';
 import Comment from '../../Component/Comment';
-import { text2Delta, beforeTextUpload } from '../../../../common/utils';
-import { createCommit } from '../../../../api/NewIssueApi';
+import EditIssueContext from '../../stores';
 
-const IssueCommit = observer(({
+function IssueCommit({
   disabled, reloadIssue, store, loginUserId, hasPermission,
-}) => {
+}) {
+  const { applyType } = useContext(EditIssueContext);
   const [addCommit, setAddCommit] = useState(false);
   const [addCommitDes, setAddCommitDes] = useState('');
   const [commentExpendAll, setCommentExpendAll] = useState(false);
   const delta = text2Delta(addCommitDes);
   const newCommit = (commit) => {
     const { issueId } = store.getIssue;
-    createCommit(commit).then(() => {
+    issueCommentApi.create(commit).then(() => {
       if (reloadIssue) {
         reloadIssue(issueId);
       }
@@ -94,9 +96,8 @@ const IssueCommit = observer(({
 
   return (
     <div id="commit" style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
-      {renderCommits()}
-      {!disabled && (
-        <div style={{ marginTop: 'auto', marginBottom: 20 }}>
+      {(!disabled || (disabled && applyType === 'agile')) && (
+        <div style={{ marginBottom: 10 }}>
           {
             addCommit ? (
               <div className="line-start mt-10" style={{ width: '100%' }}>
@@ -131,14 +132,15 @@ const IssueCommit = observer(({
                   cursor: 'pointer',
                 }}
               >
-                  点击添加评论…
+                点击添加评论…
               </div>
             )
           }
         </div>
       )}
+      {renderCommits()}
     </div>
   );
-});
+}
 
-export default IssueCommit;
+export default observer(IssueCommit);

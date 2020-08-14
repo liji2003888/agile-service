@@ -3,12 +3,14 @@ package io.choerodon.agile.api.controller.v1;
 import io.choerodon.agile.api.vo.IssueLinkCreateVO;
 import io.choerodon.agile.api.vo.IssueLinkVO;
 import io.choerodon.agile.app.service.IssueLinkService;
-import io.choerodon.core.annotation.Permission;
-import io.choerodon.core.enums.ResourceType;
+
+import io.choerodon.core.iam.ResourceLevel;
+import io.choerodon.swagger.annotation.Permission;
 import io.choerodon.core.exception.CommonException;
-import io.choerodon.core.iam.InitRoleCode;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import org.hzero.starter.keyencrypt.core.Encrypt;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,13 +30,13 @@ public class IssueLinkController {
     @Autowired
     private IssueLinkService issueLinkService;
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("创建issueLink")
     @PostMapping(value = "/{issueId}")
     public ResponseEntity<List<IssueLinkVO>> createIssueLinkList(@ApiParam(value = "项目id", required = true)
                                                                   @PathVariable(name = "project_id") Long projectId,
                                                                  @ApiParam(value = "issueId", required = true)
-                                                                  @PathVariable Long issueId,
+                                                                  @PathVariable @Encrypt Long issueId,
                                                                  @ApiParam(value = "issueLink创建对象", required = true)
                                                                   @RequestBody List<IssueLinkCreateVO> issueLinkCreateVOList) {
         return Optional.ofNullable(issueLinkService.createIssueLinkList(issueLinkCreateVOList, issueId, projectId))
@@ -42,24 +44,24 @@ public class IssueLinkController {
                 .orElseThrow(() -> new CommonException("error.IssueLink.createIssueLink"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("删除issueLink")
     @DeleteMapping(value = "/{issueLinkId}")
     public ResponseEntity deleteIssueLink(@ApiParam(value = "项目id", required = true)
                                           @PathVariable(name = "project_id") Long projectId,
                                           @ApiParam(value = "issueLinkId", required = true)
-                                          @PathVariable Long issueLinkId) {
+                                          @PathVariable @Encrypt Long issueLinkId) {
         issueLinkService.deleteIssueLink(issueLinkId);
         return new ResponseEntity(HttpStatus.NO_CONTENT);
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("根据issueId查询issueLink")
     @GetMapping(value = "/{issueId}")
     public ResponseEntity<List<IssueLinkVO>> listIssueLinkByIssueId(@ApiParam(value = "项目id", required = true)
                                                                      @PathVariable(name = "project_id") Long projectId,
                                                                     @ApiParam(value = "issueId", required = true)
-                                                                     @PathVariable Long issueId,
+                                                                     @PathVariable @Encrypt Long issueId,
                                                                     @ApiParam(value = "是否包含测试任务")
                                                                      @RequestParam(required = false,name = "no_issue_test",defaultValue = "false")
                                                                                  Boolean noIssueTest) {
@@ -68,7 +70,7 @@ public class IssueLinkController {
                 .orElseThrow(() -> new CommonException("error.IssueLink.listIssueLinkByIssueId"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("根据issueId查询issueLink,外接测试项目")
     @PostMapping(value = "/issues")
     public ResponseEntity<List<IssueLinkVO>> listIssueLinkByBatch(@ApiParam(value = "项目id", required = true)

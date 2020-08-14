@@ -95,10 +95,11 @@ class TextEditToggle extends Component {
     const root = findDOMNode(this);
     // 如果点击不在当前元素内，就调用submit提交数据
     if (!this.PortalMouseDown && !contains(root, target)) {
-      // console.log(target);
       this.handleSubmit();
     }
-    this.PortalMouseDown = false;
+    setTimeout(() => {
+      this.PortalMouseDown = false;
+    });
   }
 
   handlePortalMouseDown = () => {
@@ -109,6 +110,11 @@ class TextEditToggle extends Component {
     this.setState({
       newData: null,
     });
+    const {
+      required, fieldType, onSubmit, originData,
+      formKey, form, fieldName,
+    } = this.props;
+    form.setFieldsValue({ [formKey]: originData });
   }
 
   // 提交编辑
@@ -265,7 +271,6 @@ class TextEditToggle extends Component {
 
   renderTextChild = (children) => {
     const childrenArray = React.Children.toArray(children);
-    // console.log(childrenArray);
     return childrenArray.map(child => React.cloneElement(child, {
       newData: this.state.newData,
       originData: this.props.originData,
@@ -316,34 +321,54 @@ class TextEditToggle extends Component {
         )}
       </div>
     ) : (
-        <div
-          className={classNames({
-            'c7nagile-TextEditToggle-text': true,
-            'c7nagile-TextEditToggle-text-active': !simpleMode && !disabled,
-            [hoverType]: true,
-            noButton,
-          })}
-          ref={this.Edit}
-          // onClick={this.enterEditing}
-          onMouseDown={() => { this.timer = Date.now(); }}
-          onMouseUp={(e) => {
-            // console.log(Date.now() - this.timer);
-            if (Date.now() - this.timer <= 200) {
-              this.enterEditing(e);
-            }
-          }}
-          role="none"
-        >
-          {this.renderTextChild(children)}
-          {!simpleMode && <Icon type="arrow_drop_down" className="c7nagile-TextEditToggle-text-icon" />}
-        </div>
-      );
+      <div
+        className={classNames({
+          'c7nagile-TextEditToggle-text': true,
+          'c7nagile-TextEditToggle-text-active': !simpleMode && !disabled,
+          [hoverType]: true,
+          noButton,
+        })}
+        ref={this.Edit}
+        onMouseDown={() => { this.timer = Date.now(); }}
+        onMouseUp={(e) => {
+          if (Date.now() - this.timer <= 200) {
+            this.enterEditing(e);
+          }
+        }}
+        role="none"
+      >
+        {this.renderTextChild(children)}
+        {!simpleMode && <Icon type="arrow_drop_down" className="c7nagile-TextEditToggle-text-icon" />}
+      </div>
+    );
+  }
+
+  ToggleBlur = (e) => {
+    if (!this.PortalMouseDown) {
+      this.handleSubmit();
+    }
+  }
+
+  handleKeyDown = (e) => {
+    const { submitOnEnter } = this.props;
+    if (e.keyCode === 13 && submitOnEnter) {
+      this.handleSubmit();
+    }
   }
 
   render() {
-    const { style, className } = this.props;
+    const { style, className, focusAble } = this.props;
+    let extraProps = {};
+    if (focusAble) {
+      extraProps = {
+        tabIndex: 0,
+        onFocus: this.enterEditing,
+        onBlur: this.ToggleBlur,
+        onKeyDown: this.handleKeyDown,
+      };
+    }
     return (
-      <div style={style} className={`c7nagile-TextEditToggle ${className || ''}`}>
+      <div style={style} className={`c7nagile-TextEditToggle ${className || ''}`} {...extraProps}>
         {this.renderChild()}
       </div>
     );

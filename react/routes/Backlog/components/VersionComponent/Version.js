@@ -1,13 +1,11 @@
 import React, { Component } from 'react';
 import { observer } from 'mobx-react';
 import { Form, Icon } from 'choerodon-ui';
-import { stores } from '@choerodon/boot';
+import { versionApi } from '@/api';
 import { DragDropContext, Droppable } from 'react-beautiful-dnd';
 import BacklogStore from '../../../../stores/project/backlog/BacklogStore';
 import VersionItem from './VersionItem';
 import './Version.less';
-
-const { AppState } = stores;
 
 @observer
 class Version extends Component {
@@ -15,8 +13,6 @@ class Version extends Component {
     super(props);
     this.state = {
       draggableIds: [],
-      hoverBlockButton: false,
-      addRelease: false,
     };
   }
 
@@ -25,7 +21,7 @@ class Version extends Component {
   }
 
   versionRefresh = () => {
-    BacklogStore.axiosGetVersion().then((res) => {
+    versionApi.loadAll().then((res) => {
       BacklogStore.setVersionData(res);
     });
   };
@@ -37,10 +33,11 @@ class Version extends Component {
    * @memberof Version
    */
   handleClickVersion(type) {
-    BacklogStore.setChosenVersion(type);
+    const { chosenVersion } = BacklogStore;
+    BacklogStore.setChosenVersion(type === chosenVersion ? 'all' : type);
     BacklogStore.axiosGetSprint().then((res) => {
       BacklogStore.setSprintData(res);
-    }).catch((error) => {
+    }).catch(() => {
     });
   }
 
@@ -49,9 +46,8 @@ class Version extends Component {
       issueRefresh,
       refresh,
     } = this.props;
-    const { hoverBlockButton, draggableIds, addRelease } = this.state;
-    const menu = AppState.currentMenuType;
-    const { type, id: projectId, organizationId: orgId } = menu;
+    const { draggableIds } = this.state;
+
     return BacklogStore.getCurrentVisible === 'version' ? (
       <div className="c7n-backlog-version">
         <div className="c7n-backlog-versionContent">
@@ -73,18 +69,6 @@ class Version extends Component {
             </div>
           </div>
           <div className="c7n-backlog-versionChoice">
-            <div
-              className="c7n-backlog-versionItems primary"
-              style={{
-                background: BacklogStore.getChosenVersion === 'all' ? 'rgba(140, 158, 255, 0.08)' : '',
-              }}
-              role="none"
-              onClick={() => {
-                this.handleClickVersion('all');
-              }}
-            >
-              {'所有问题'}
-            </div>
             <DragDropContext
               onDragEnd={(result) => {
                 const { destination, source, draggableId } = result;
@@ -117,7 +101,7 @@ class Version extends Component {
             <div
               className="c7n-backlog-versionItems"
               style={{
-                background: BacklogStore.getChosenVersion === 'unset' ? 'rgba(140, 158, 255, 0.08)' : '',
+                background: BacklogStore.getChosenVersion === 'unset' ? 'rgba(140, 158, 254, 0.16)' : '',
               }}
               role="none"
               onClick={() => {
@@ -125,18 +109,18 @@ class Version extends Component {
               }}
               onMouseUp={() => {
                 if (BacklogStore.getIsDragging) {
-                  BacklogStore.axiosUpdateIssuesToVersion(
+                  versionApi.addIssues(
                     0, draggableIds,
                   ).then((res) => {
                     issueRefresh();
                     refresh();
-                  }).catch((error) => {
+                  }).catch(() => {
                     refresh();
                   });
                 }
               }}
             >
-              {'未指定版本的问题'}
+              未指定版本的问题
             </div>
           </div>
         </div>

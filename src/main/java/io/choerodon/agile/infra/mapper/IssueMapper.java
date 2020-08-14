@@ -1,14 +1,16 @@
 package io.choerodon.agile.infra.mapper;
 
 import io.choerodon.agile.api.vo.IssueIdSprintIdVO;
+import io.choerodon.agile.api.vo.IssueOverviewVO;
 import io.choerodon.agile.api.vo.SearchVO;
 import io.choerodon.agile.infra.dto.*;
-import io.choerodon.mybatis.common.Mapper;
+import io.choerodon.mybatis.common.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 
 /**
@@ -17,7 +19,7 @@ import java.util.Map;
  * @author dinghuang123@gmail.com
  * @since 2018-05-14 20:30:48
  */
-public interface IssueMapper extends Mapper<IssueDTO> {
+public interface IssueMapper extends BaseMapper<IssueDTO> {
 
     int removeFromSprint(@Param("projectId") Long projectId, @Param("sprintId") Long sprintId);
 
@@ -135,7 +137,6 @@ public interface IssueMapper extends Mapper<IssueDTO> {
                                                  @Param("self") Boolean self,
                                                  @Param("content") String content);
 
-    List<ExportIssuesDTO> queryExportIssues(@Param("projectId") Long projectId, @Param("issueIds") List<Long> issueIds, @Param("projectCode") String projectCode);
 
     List<SprintNameDTO> querySprintNameByIssueIds(@Param("projectId") Long projectId, @Param("issueIds") List<Long> issueIds);
 
@@ -186,7 +187,7 @@ public interface IssueMapper extends Mapper<IssueDTO> {
                                                       @Param("typeCode") String typeCode,
                                                       @Param("date") Date date);
 
-    List<Long> queryInVersionIssueIds(@Param("projectId") Long projectId, @Param("versionId") Long versionId, @Param("issueIds") List<Long> issueIds);
+//    List<Long> queryInVersionIssueIds(@Param("projectId") Long projectId, @Param("versionId") Long versionId, @Param("issueIds") List<Long> issueIds);
 
     /**
      * 查询issue和issue没有关闭的冲刺
@@ -224,15 +225,15 @@ public interface IssueMapper extends Mapper<IssueDTO> {
      */
     Integer queryMaxEpicSequenceByProject(@Param("projectId") Long projectId);
 
-    /**
-     * 返回issue统计信息
-     *
-     * @param projectId  projectId
-     * @param type       type查询的类型
-     * @param issueTypes issueTypes要排除的issue类型
-     * @return PieChartDTO
-     */
-    List<PieChartDTO> issueStatistic(@Param("projectId") Long projectId, @Param("type") String type, @Param("issueTypes") List<String> issueTypes);
+//    /**
+//     * 返回issue统计信息
+//     *
+//     * @param projectId  projectId
+//     * @param type       type查询的类型
+//     * @param issueTypes issueTypes要排除的issue类型
+//     * @return PieChartDTO
+//     */
+//    List<PieChartDTO> issueStatistic(@Param("projectId") Long projectId, @Param("type") String type, @Param("issueTypes") List<String> issueTypes);
 
     /**
      * 返回issue的详情列表（测试模块用）
@@ -319,20 +320,20 @@ public interface IssueMapper extends Mapper<IssueDTO> {
      */
     List<IssueBurnDownReportDTO> queryIssueByVersionId(@Param("projectId") Long projectId, @Param("versionId") Long versionId);
 
-    /**
-     * 根据ids查询所有issue
-     *
-     * @param projectId projectId
-     * @param issueIds  issueIds
-     * @return IssueDTO
-     */
-    List<IssueDetailDTO> queryByIssueIds(@Param("projectId") Long projectId, @Param("issueIds") List<Long> issueIds);
+//    /**
+//     * 根据ids查询所有issue
+//     *
+//     * @param projectId projectId
+//     * @param issueIds  issueIds
+//     * @return IssueDTO
+//     */
+//    List<IssueDetailDTO> queryByIssueIds(@Param("projectId") Long projectId, @Param("issueIds") List<Long> issueIds);
 
     String selectMaxRankByProjectId(@Param("projectId") Long projectId);
 
-    List<Long> selectIssueIdsByProjectId(@Param("projectId") Long projectId);
+//    List<Long> selectIssueIdsByProjectId(@Param("projectId") Long projectId);
 
-    void updateMapRank(@Param("projectId") Long projectId, @Param("mapMoveIssueDOS") List<StoryMapMoveIssueDO> mapMoveIssueDOS);
+//    void updateMapRank(@Param("projectId") Long projectId, @Param("mapMoveIssueDOS") List<StoryMapMoveIssueDO> mapMoveIssueDOS);
 
     Integer queryIssueIdsIsTest(@Param("projectId") Long projectId, @Param("issueIds") List<Long> issueIds);
 
@@ -356,19 +357,22 @@ public interface IssueMapper extends Mapper<IssueDTO> {
      */
     IssueDTO queryEpicWithStatusByIssueId(@Param("issueId") Long issueId, @Param("projectId") Long projectId);
 
-    /**
-     * 根据项目分组测试类型issue
-     *
-     * @return IssueProjectDTO
-     */
-    List<IssueProjectDTO> queryIssueTestGroupByProject();
+//    /**
+//     * 根据项目分组测试类型issue
+//     *
+//     * @return IssueProjectDTO
+//     */
+//    List<IssueProjectDTO> queryIssueTestGroupByProject();
 
-    List<Long> queryIssueIdsListWithSub(@Param("projectId") Long projectId,
-                                        @Param("searchVO") SearchVO searchVO,
-                                        @Param("filterSql") String filterSql,
-                                        @Param("assigneeFilterIds") List<Long> assigneeFilterIds);
+    List<IssueDTO> queryIssueIdsListWithSub(@Param("projectId") Long projectId,
+                                            @Param("searchVO") SearchVO searchVO,
+                                            @Param("filterSql") String filterSql,
+                                            @Param("assigneeFilterIds") List<Long> assigneeFilterIds,
+                                            @Param("orderStr") String orderStr);
 
-    List<IssueDTO> queryIssueListWithSubByIssueIds(@Param("issueIds") List<Long> issueIds);
+    List<IssueDTO> queryIssueListWithSubByIssueIds(@Param("issueIds") List<Long> issueIds,
+                                                   @Param("childrenIds") Set<Long> childrenIds,
+                                                   @Param("isExcelExported") boolean isExcelExported);
 
     /**
      * 查询issueIds对应的issueDo
@@ -443,7 +447,7 @@ public interface IssueMapper extends Mapper<IssueDTO> {
 
     List<Long> querySubBugIdsByIssueId(@Param("projectId") Long projectId, @Param("issueId") Long issueId);
 
-    IssueNumDTO queryIssueByIssueNum (@Param("projectId") Long projectId, @Param("issueNum") String issueNum);
+//    IssueNumDTO queryIssueByIssueNum (@Param("projectId") Long projectId, @Param("issueNum") String issueNum);
 
     void updateSubBugRelateIssueId(@Param("projectId") Long projectId, @Param("issueId") Long issueId);
 
@@ -452,4 +456,59 @@ public interface IssueMapper extends Mapper<IssueDTO> {
     List<Long> queryProjectIds();
 
     List<IssueDTO> listIssueInfoByIssueIds(@Param("projectId") Long projectId, @Param("issueIds") List<Long> issueIds);
+
+    Set<Long> queryChildrenIdByParentId(@Param("issueIds") List<Long> issueIds,
+                                        @Param("projectId") Long projectId,
+                                        @Param("searchVO") SearchVO searchVO,
+                                        @Param("filterSql") String filterSql,
+                                        @Param("assigneeFilterIds") List<Long> assigneeFilterIds);
+
+    List<IssueDTO> queryStoryAndTaskByProjectId(@Param("projectId") Long projectId,@Param("searchVO") SearchVO searchVO);
+
+    List<Long> selectIssueSubTaskAndSubBugIds(@Param("projectId") Long projectId,@Param("issueIds")  List<Long> issueIds);
+
+    /**
+     * 查项目下issue的assignee_id
+     *
+     * @param projectId
+     * @return
+     */
+    Set<Long> selectUserIdsByProjectId(@Param("projectId") Long projectId);
+
+    /**
+     * 查项目下issue的reporter_id
+     *
+     * @param projectId
+     * @return
+     */
+    Set<Long> selectReporterIdsByProjectId(@Param("projectId") Long projectId);
+
+    /**
+     * 查询个人未完成故事，任务和bug
+     * @param projectIds
+     * @param userId
+     * @return
+     */
+    List<IssueDTO> queryParentIssueByProjectIdsAndUserId(@Param("projectIds") List<Long> projectIds, @Param("userId") Long userId);
+
+    /**
+     * 查询个人在所有子项目中未完成的问题
+     * @param projectIds
+     * @param parentIssues
+     * @param userId
+     * @return
+     */
+    List<IssueDTO> listIssuesByParentIssueIdsAndUserId(@Param("projectIds") List<Long> projectIds,@Param("parentIssues") List<Long> parentIssues,@Param("userId") Long userId);
+
+    List<IssueOverviewVO> selectIssueBysprint(@Param("projectId") Long projectId,
+                                              @Param("sprintId") Long sprintId,
+                                              @Param("statusSet") Set<String> statusSet);
+
+    void updateStatusByStatusId(@Param("projectId")Long projectId,@Param("currentStatusId") Long currentStatusId,@Param("statusId") Long statusId);
+
+    List<Long> selectStatusIdByIssueType(@Param("projectId") Long projectId,@Param("issueTypeId") Long issueTypeId);
+
+    List<IssueCountDTO> countIssueTypeByStatusIds(@Param("projectId") Long projectId,@Param("statusIds") List<Long> statusIds);
+
+    List<Long> selectIssueTypeIdsByStatusId(@Param("projectId") Long projectId, @Param("statusId") Long statusId);
 }

@@ -1,8 +1,8 @@
 import React, { Component } from 'react';
-import { stores, axios } from '@choerodon/boot';
+import { stores } from '@choerodon/boot';
 import _ from 'lodash';
 import { Modal, Form, Select } from 'choerodon-ui';
-import { createLink, loadIssuesInLink } from '../../api/NewIssueApi';
+import { issueApi, statusApi } from '@/api';
 import TypeTag from '../TypeTag';
 
 import './TransformSubIssue.less';
@@ -24,7 +24,7 @@ class TransformSubIssue extends Component {
     this.setState({
       selectLoading: true,
     });
-    loadIssuesInLink(1, 20, issueId, input).then((res) => {
+    issueApi.loadIssuesInLink(1, 20, issueId, input).then((res) => {
       this.setState({
         originIssues: res.list,
         selectLoading: false,
@@ -56,7 +56,7 @@ class TransformSubIssue extends Component {
       this.setState({
         selectLoading: true,
       });
-      loadIssuesInLink(1, 20, issueId, input).then((res) => {
+      issueApi.loadIssuesInLink(1, 20, issueId, input).then((res) => {
         this.setState({
           originIssues: res.list,
           selectLoading: false,
@@ -72,25 +72,21 @@ class TransformSubIssue extends Component {
     this.setState({
       selectLoading: true,
     });
-    const { store } = this.props;
-    const proId = AppState.currentMenuType.id;
-    const issueTypeData = store.getIssueTypes ? store.getIssueTypes : [];
+    const { issueTypes } = this.props;
+    const issueTypeData = issueTypes;
     const subTask = issueTypeData.find(t => t.typeCode === 'sub_task');
     if (subTask) {
-      axios.get(`/agile/v1/projects/${proId}/schemes/query_status_by_issue_type_id?issue_type_id=${subTask.id}&apply_type=agile`)
-        .then((res) => {
-          this.setState({
-            selectLoading: false,
-            originStatus: res,
-          });
+      statusApi.loadAllForIssueType(subTask.id).then((res) => {
+        this.setState({
+          selectLoading: false,
+          originStatus: res,
         });
-
-      axios.get(`/agile/v1/projects/${proId}/status/query_first_status?organizationId=${AppState.currentMenuType.organizationId}&applyType=agile&issueTypeId=${subTask.id}`)
-        .then((res) => {
-          this.setState({
-            selectDefaultValue: res,
-          });
+      });
+      statusApi.loadFirstInWorkFlow(subTask.id).then((res) => {
+        this.setState({
+          selectDefaultValue: res,
         });
+      });
     } else {
       this.setState({
         selectLoading: false,
@@ -101,13 +97,11 @@ class TransformSubIssue extends Component {
 
   handleTransformSubIssue = () => {
     const {
-      form, onOk, store, issueId, ovn,
+      form, onOk, issueTypes, issueId, ovn,
     } = this.props;
     form.validateFields((err, values) => {
       if (!err) {
-        const projectId = AppState.currentMenuType.id;
-        const orgId = AppState.currentMenuType.organizationId;
-        const issueTypeData = store.getIssueTypes ? store.getIssueTypes : [];
+        const issueTypeData = issueTypes;
         const subTask = issueTypeData.find(t => t.typeCode === 'sub_task');
         const issueTransformSubTask = {
           issueId,
@@ -120,7 +114,7 @@ class TransformSubIssue extends Component {
         this.setState({
           loading: true,
         });
-        axios.post(`/agile/v1/projects/${projectId}/issues/transformed_sub_task?organizationId=${orgId}`, issueTransformSubTask)
+        issueApi.taskTransformSubTask(issueTransformSubTask)
           .then((res) => {
             this.setState({
               loading: false,

@@ -1,6 +1,8 @@
 package io.choerodon.agile.api.vo;
 
+
 import io.swagger.annotations.ApiModelProperty;
+import org.hzero.starter.keyencrypt.core.Encrypt;
 
 import java.util.List;
 
@@ -10,6 +12,7 @@ import java.util.List;
  */
 public class ObjectSchemeFieldDetailVO {
     @ApiModelProperty(value = "字段id")
+    @Encrypt
     private Long id;
     @ApiModelProperty(value = "字段编码")
     private String code;
@@ -31,6 +34,7 @@ public class ObjectSchemeFieldDetailVO {
     private Boolean system;
     @ApiModelProperty(value = "是否必填")
     private Boolean required;
+    private String requiredScope;
     @ApiModelProperty(value = "上下文")
     private String[] context;
     @ApiModelProperty(value = "对象方案编码")
@@ -43,6 +47,14 @@ public class ObjectSchemeFieldDetailVO {
     private Long objectVersionNumber;
     @ApiModelProperty(value = "字段选项列表")
     private List<FieldOptionVO> fieldOptions;
+
+    public String getRequiredScope() {
+        return requiredScope;
+    }
+
+    public void setRequiredScope(String requiredScope) {
+        this.requiredScope = requiredScope;
+    }
 
     public Object getDefaultValueObj() {
         return defaultValueObj;

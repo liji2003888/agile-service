@@ -1,10 +1,7 @@
 package io.choerodon.agile.app.service.impl;
 
-import com.github.pagehelper.PageInfo;
-import io.choerodon.agile.api.vo.ProjectVO;
-import io.choerodon.agile.api.vo.RoleAssignmentSearchVO;
-import io.choerodon.agile.api.vo.RoleVO;
-import io.choerodon.agile.api.vo.UserVO;
+import io.choerodon.core.domain.Page;
+import io.choerodon.agile.api.vo.*;
 import io.choerodon.agile.app.service.UserService;
 import io.choerodon.agile.infra.utils.ConvertUtil;
 import io.choerodon.agile.infra.dto.UserDTO;
@@ -15,11 +12,11 @@ import io.choerodon.core.oauth.DetailsHelper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.ObjectUtils;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
 
 /**
  * @author dinghuang123@gmail.com
@@ -27,6 +24,8 @@ import java.util.Map;
  */
 @Component
 public class UserServiceImpl implements UserService {
+
+    private static final String PROJECT_ADMIN = "project-admin";
 
     private final BaseFeignClient baseFeignClient;
 
@@ -65,7 +64,14 @@ public class UserServiceImpl implements UserService {
                 userDTOS.forEach(userDO -> {
                     String ldapName = userDO.getRealName() + "（" + userDO.getLoginName() + "）";
                     String noLdapName = userDO.getRealName() + "（" + userDO.getEmail() + "）";
-                    userMessageMap.put(userDO.getId(), new UserMessageDTO(userDO.getLdap() ? ldapName : noLdapName , userDO.getLoginName(), userDO.getRealName(), userDO.getImageUrl(), userDO.getEmail(), userDO.getLdap()));
+                    userMessageMap.put(userDO.getId(),
+                            new UserMessageDTO(userDO.getLdap() ? ldapName : noLdapName,
+                                    userDO.getLoginName(),
+                                    userDO.getRealName(),
+                                    userDO.getImageUrl(),
+                                    userDO.getEmail(),
+                                    userDO.getLdap(),
+                                    userDO.getId()));
                 });
             } else {
                 userDTOS.forEach(userDO -> userMessageMap.put(userDO.getId(), new UserMessageDTO(userDO.getRealName(), userDO.getLoginName(), userDO.getRealName(), userDO.getImageUrl(), userDO.getEmail(), userDO.getLdap())));
@@ -76,12 +82,27 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<UserVO> queryUsersByNameAndProjectId(Long projectId, String name) {
-        ResponseEntity<PageInfo<UserVO>> userList = baseFeignClient.list(projectId, name);
+        ResponseEntity<Page<UserVO>> userList = baseFeignClient.list(projectId, name);
         if (userList != null) {
-            return userList.getBody().getList();
+            return userList.getBody().getContent();
         } else {
             return new ArrayList<>();
         }
+    }
+
+    @Override
+    public List<UserVO> listUsersByRealNames(List<String> realNames, boolean onlyEnabled) {
+        if (ObjectUtils.isEmpty(realNames)) {
+            return new ArrayList<>();
+        } else {
+            return baseFeignClient.listUsersByRealNames(onlyEnabled, new HashSet<>(realNames)).getBody();
+        }
+    }
+
+    @Override
+    public List<UserVO> listProjectAdminUsersByProjectId(Long projectId) {
+        List<UserVO> users = baseFeignClient.listProjectOwnerById(projectId).getBody();
+        return !CollectionUtils.isEmpty(users) ? users : new ArrayList<>();
     }
 
     @Override
@@ -96,9 +117,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public PageInfo<UserVO> pagingQueryUsersByRoleIdOnProjectLevel(int page, int size, Long roleId, Long sourceId, RoleAssignmentSearchVO roleAssignmentSearchVO) {
-        ResponseEntity<PageInfo<UserVO>> users = baseFeignClient.pagingQueryUsersByRoleIdOnProjectLevel(page, size, roleId, sourceId, roleAssignmentSearchVO);
-        return users != null ? users.getBody() : new PageInfo<>(new ArrayList<>());
+    public Page<UserVO> pagingQueryUsersByRoleIdOnProjectLevel(int page, int size, Long roleId, Long sourceId, RoleAssignmentSearchVO roleAssignmentSearchVO) {
+        ResponseEntity<Page<UserVO>> users = baseFeignClient.pagingQueryUsersByRoleIdOnProjectLevel(page, size, roleId, sourceId, roleAssignmentSearchVO);
+        return users != null ? users.getBody() : new Page<>();
     }
 
     @Override
@@ -113,4 +134,33 @@ public class UserServiceImpl implements UserService {
         return projectDTOResponseEntity != null ? projectDTOResponseEntity.getBody() : null;
     }
 
+//    @Override
+//    public WebHookJsonSendDTO.User getWebHookUserById(Long userId) {
+//        Long[] ids = new Long[2];
+//        ids[0] = userId;
+//        ResponseEntity<List<UserDTO>> users = baseFeignClient.listUsersByIds(ids, false);
+//        if (users != null) {
+//            UserDTO userDTO = users.getBody().get(0);
+//            return new WebHookJsonSendDTO.User(userDTO.getLoginName(), userDTO.getRealName());
+//        } else {
+//            return new WebHookJsonSendDTO.User("0", "unknown");
+//        }
+//    }
+
+    @Override
+    public boolean isProjectOwner(Long projectId, Long userId) {
+        if (ObjectUtils.isEmpty(projectId)
+                || ObjectUtils.isEmpty(userId)) {
+            return false;
+        }
+
+        boolean  isProjectOwner = baseFeignClient.checkIsProjectOwner(userId, projectId).getBody();
+        if (ObjectUtils.isEmpty(isProjectOwner)) {
+            return false;
+        } else {
+            return isProjectOwner;
+        }
+    }
+    
+    
 }

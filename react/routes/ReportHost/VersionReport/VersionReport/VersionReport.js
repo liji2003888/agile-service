@@ -1,14 +1,13 @@
 import React, { Component } from 'react';
 import { observer } from 'mobx-react';
 import ReactEcharts from 'echarts-for-react';
-import _ from 'lodash';
 import {
   Page, Header, Content, stores, Breadcrumb,
 } from '@choerodon/boot';
 import {
   Button, Tabs, Table, Select, Icon, Tooltip, Spin,
 } from 'choerodon-ui';
-// import pic from './no_version.svg';
+import STATUS from '@/constants/STATUS';
 import pic from '../../../../assets/image/emptyChart.svg';
 import finish from './legend/finish.svg';
 import total from './legend/total.svg';
@@ -20,30 +19,14 @@ import TypeTag from '../../../../components/TypeTag';
 import VS from '../../../../stores/project/versionReportNew';
 import EmptyBlock from '../../../../components/EmptyBlock';
 import './VersionReport.less';
-import { STATUS } from '../../../../common/Constant';
 
 const { TabPane } = Tabs;
 const { AppState } = stores;
 const { Option } = Select;
-const MONTH = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
-let backUrl;
 
 @observer
 class EpicReport extends Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      linkFromParamUrl: undefined,
-    };
-  }
-
   componentDidMount() {
-    const { location: { search } } = this.props;
-    const linkFromParamUrl = _.last(search.split('&')).split('=')[0] === 'paramUrl' ? _.last(search.split('&')).split('=')[1] : undefined;
-    this.setState({
-      linkFromParamUrl,
-    });
-
     VS.loadEpicAndChartAndTableData();
   }
 
@@ -505,7 +488,7 @@ class EpicReport extends Component {
               onClick={() => {
                 const { history } = this.props;
                 const urlParams = AppState.currentMenuType;
-                history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramName=${issueNum}&paramIssueId=${record.issueId}&paramUrl=reporthost/versionReport`);
+                history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramName=${issueNum}&paramIssueId=${encodeURIComponent(record.issueId)}&paramUrl=reporthost/versionReport`);
               }}
             >
               {issueNum}
@@ -567,7 +550,6 @@ class EpicReport extends Component {
               <Tooltip mouseEnterDelay={0.5} title={`任务状态： ${record.statusVO.name}`}>
                 <div>
                   <StatusTag
-                    inTable
                     style={{ display: 'inline-block' }}
                     name={record.statusVO.name}
                     color={STATUS[record.statusVO.type]}
@@ -606,13 +588,11 @@ class EpicReport extends Component {
 
   render() {
     const { history } = this.props;
-    const { linkFromParamUrl } = this.state;
     const urlParams = AppState.currentMenuType;
     return (
-      <Page className="c7n-versionReport">
+      <Page className="c7n-versionReport" serice={['choerodon.code.project.operation.chart.ps.choerodon.code.project.operation.chart.ps.versionreport']}>
         <Header
           title="版本报告图"
-          // backPath={`/agile/${linkFromParamUrl || 'reporthost'}?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}`}
           backPath={`/charts?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}`}
         >
           <SwithChart
@@ -674,7 +654,7 @@ class EpicReport extends Component {
                     role="none"
                     onClick={() => {
                       // history.push(encodeURI(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${urlParams.name}&organizationId=${urlParams.organizationId}&paramType=version&paramId=${VS.currentVersionId}&paramName=${VS.getCurrentVersion.name}下的问题&paramUrl=reporthost/VersionReport`));
-                      history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramType=version&paramId=${VS.currentVersionId}&paramName=${encodeURIComponent(`${VS.getCurrentVersion.name}下的问题`)}&paramUrl=reporthost/VersionReport`);
+                      history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramType=version&paramId=${encodeURIComponent(VS.currentVersionId)}&paramName=${encodeURIComponent(`${VS.getCurrentVersion.name}下的问题`)}&paramUrl=reporthost/VersionReport`);
                     }}
                   >
                     在“问题管理中”查看
@@ -694,8 +674,8 @@ class EpicReport extends Component {
                         </div>
                       ) : (
                         <div style={{ padding: '20px 0', textAlign: 'center', width: '100%' }}>
-                            {VS.tableData.length ? '当前单位下问题均未预估，切换单位或从下方问题列表进行预估。' : '当前版本下没有问题。'}
-                          </div>
+                          {VS.tableData.length ? '当前单位下问题均未预估，切换单位或从下方问题列表进行预估。' : '当前版本下没有问题。'}
+                        </div>
                       )
                     }
                   </div>
@@ -730,7 +710,7 @@ class EpicReport extends Component {
                       style={{ margin: '0 5px', cursor: 'pointer' }}
                       role="none"
                       onClick={() => {
-                        history.push(`/agile/release?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}`);
+                        history.push(`/agile/work-list/version?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}`);
                       }}
                     >
                       发布版本

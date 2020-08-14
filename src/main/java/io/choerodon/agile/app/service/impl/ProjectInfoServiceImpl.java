@@ -1,22 +1,19 @@
 package io.choerodon.agile.app.service.impl;
 
-import com.github.pagehelper.PageInfo;
 import io.choerodon.agile.api.vo.*;
 import io.choerodon.agile.app.service.ProjectInfoService;
 import io.choerodon.agile.api.vo.event.ProjectEvent;
-import io.choerodon.agile.infra.utils.ConvertUtil;
 import io.choerodon.agile.infra.dto.ProjectInfoDTO;
 import io.choerodon.agile.infra.feign.BaseFeignClient;
 import io.choerodon.agile.infra.mapper.ProjectInfoMapper;
 import io.choerodon.core.exception.CommonException;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
-import org.modelmapper.convention.MatchingStrategies;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.ObjectUtils;
 
-import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,13 +29,8 @@ public class ProjectInfoServiceImpl implements ProjectInfoService {
     private ProjectInfoMapper projectInfoMapper;
     @Autowired
     private BaseFeignClient baseFeignClient;
-
-    private ModelMapper modelMapper = new ModelMapper();
-
-    @PostConstruct
-    public void init() {
-        modelMapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
-    }
+    @Autowired
+    private ModelMapper modelMapper;
 
     @Override
     public void initializationProjectInfo(ProjectEvent projectEvent) {
@@ -73,18 +65,12 @@ public class ProjectInfoServiceImpl implements ProjectInfoService {
     public ProjectInfoVO queryProjectInfoByProjectId(Long projectId) {
         ProjectInfoDTO projectInfoDTO = new ProjectInfoDTO();
         projectInfoDTO.setProjectId(projectId);
-        return modelMapper.map(projectInfoMapper.selectOne(projectInfoDTO), ProjectInfoVO.class);
-    }
-
-    @Override
-    public List<ProjectRelationshipVO> queryProgramTeamInfo(Long projectId) {
-        Long organizationId = ConvertUtil.getOrganizationId(projectId);
-        List<ProjectRelationshipVO> projectRelationshipVOS = baseFeignClient.getProjUnderGroup(organizationId, projectId, true).getBody();
-        for (ProjectRelationshipVO relationshipVO : projectRelationshipVOS) {
-            PageInfo<UserWithRoleVO> users = baseFeignClient.pagingQueryUsersWithProjectLevelRoles(0, 0, relationshipVO.getProjectId(), new RoleAssignmentSearchVO(), false).getBody();
-            relationshipVO.setUserCount(users.getSize());
+        ProjectInfoDTO dto = projectInfoMapper.selectOne(projectInfoDTO);
+        if (ObjectUtils.isEmpty(dto)) {
+            return null;
+        } else {
+            return modelMapper.map(dto, ProjectInfoVO.class);
         }
-        return projectRelationshipVOS;
     }
 
     /**

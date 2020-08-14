@@ -6,8 +6,9 @@ import {
 } from 'choerodon-ui';
 import { Modal } from 'choerodon-ui/pro';
 import {
-  TabPage as Page, Header, Content, stores, axios, Breadcrumb,
+  TabPage as Page, Header, Content, stores, Breadcrumb,
 } from '@choerodon/boot';
+import { quickFilterApi } from '@/api';
 import CreateFilter from './Component/CreateFilter';
 import EditFilter from './Component/EditFilter';
 import DeleteFilter from './Component/DeleteFilter';
@@ -102,6 +103,8 @@ class Search extends Component {
       '=': '等于',
       OR: '或',
       AND: '与',
+      'not like': '不包含',
+      like: '包含',
     };
 
     let transformKey = str;
@@ -115,25 +118,16 @@ class Search extends Component {
     this.setState({
       filters: data,
     });
-    axios
-      .put(`/agile/v1/projects/${AppState.currentMenuType.id}/quick_filter/drag`, postData)
+    quickFilterApi.drag(postData)
       .then(() => {
-        axios.post(`/agile/v1/projects/${AppState.currentMenuType.id}/quick_filter/query_all`, {
-          contents: [
-          ],
-          filterName: '',
-        }).then((res) => {
+        quickFilterApi.loadAll({ contents: [], filterName: '' }).then((res) => {
           this.setState({
             filters: res,
           });
         });
       })
       .catch(() => {
-        axios.post(`/agile/v1/projects/${AppState.currentMenuType.id}/quick_filter/query_all`, {
-          contents: [
-          ],
-          filterName: '',
-        }).then((ress) => {
+        quickFilterApi.loadAll({ contents: [], filterName: '' }).then((ress) => {
           this.setState({
             filters: ress,
           });
@@ -156,26 +150,21 @@ class Search extends Component {
       deleteFilterShow: true,
     });
   }
-
-  deleteComponent() {
-    this.loadComponents();
-  }
-
-  loadFilters(page = 0, size = 10) {
+  
+  loadFilters() {
     const { filterName, barFilters } = this.state;
     this.setState({
       loading: true,
     });
-    axios.post(`/agile/v1/projects/${AppState.currentMenuType.id}/quick_filter/query_all`, {
+    quickFilterApi.loadAll({
       contents: barFilters,
       filterName,
+    }).then((res) => {
+      this.setState({
+        filters: res,
+        loading: false,
+      });
     })
-      .then((res) => {
-        this.setState({
-          filters: res,
-          loading: false,
-        });
-      })
       .catch((error) => { });
   }
 
@@ -233,7 +222,7 @@ class Search extends Component {
             menu={this.renderMenu(record)}
             onClickEdit={this.handleClickEdit.bind(this, record)}
             text={(
-              <Tooltip placement="topLeft" mouseEnterDelay={0.5} title={name}>
+              <Tooltip placement="topLeft" mouseEnterDelay={0.5} title={text}>
                 <p
                   style={{
                     width: '3.5rem',
@@ -254,7 +243,7 @@ class Search extends Component {
       {
         title: '筛选器',
         dataIndex: 'expressQuery',
-        width: '50%',
+        // width: '50%',
         render: expressQuery => (
           <div style={{
             maxWidth: '422px',
@@ -283,7 +272,7 @@ class Search extends Component {
       {
         title: '描述',
         dataIndex: 'description',
-        width: '25%',
+        // width: '25%',
         render: description => (
           <div style={{
             maxWidth: '288px',
@@ -311,17 +300,10 @@ class Search extends Component {
     ];
 
     return (
-      <Page 
+      <Page
         className="c7n-fast-search"
         service={[
-          'agile-service.quick-filter.listByProjectId',
-          'agile-service.quick-filter.queryById',
-          'agile-service.quick-filter.update',
-          'agile-service.quick-filter.create',
-          'agile-service.quick-filter.checkName',
-          'agile-service.quick-filter.dragFilter',
-          'agile-service.quick-filter.list',
-          'agile-service.quick-filter.deleteById',
+          'choerodon.code.project.setting.issue.ps.fastsearch',
         ]}
       >
         <Header title="快速筛选">

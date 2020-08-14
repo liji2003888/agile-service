@@ -1,12 +1,13 @@
 import React, { Component } from 'react';
 import { Icon, Popconfirm } from 'choerodon-ui';
+import {
+  text2Delta, beforeTextUpload,
+} from '@/utils/richText';
+import { issueCommentApi } from '@/api/IssueComment';
 import UserHead from '../../UserHead';
 import WYSIWYGEditor from '../../WYSIWYGEditor';
-import { IssueDescription, DatetimeAgo } from '../../CommonComponent';
-import {
-  delta2Html, text2Delta, beforeTextUpload,
-} from '../../../common/utils';
-import { deleteCommit, updateCommit } from '../../../api/NewIssueApi';
+import WYSIWYGViewer from '../../WYSIWYGViewer';
+import { DatetimeAgo } from '../../CommonComponent';
 import './Comment.less';
 
 
@@ -25,7 +26,7 @@ class Comment extends Component {
 
   handleDeleteCommit = (commentId) => {
     const { onDeleteComment } = this.props;
-    deleteCommit(commentId)
+    issueCommentApi.delete(commentId)
       .then(() => {
         if (onDeleteComment) {
           onDeleteComment();
@@ -51,7 +52,7 @@ class Comment extends Component {
 
   updateComment = (comment) => {
     const { onUpdateComment } = this.props;
-    updateCommit(comment).then(() => {
+    issueCommentApi.update(comment).then(() => {
       this.setState({
         editCommentId: undefined,
         editComment: undefined,
@@ -196,7 +197,7 @@ class Comment extends Component {
                         // toolbarHeight={66}
                         />
                       ) : (
-                        <IssueDescription data={delta2Html(comment.commentText)} />
+                        <WYSIWYGViewer data={comment.commentText} />
                       )
                     }
                   </div>

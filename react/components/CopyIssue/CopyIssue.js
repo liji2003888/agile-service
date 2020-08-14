@@ -1,11 +1,12 @@
 import React, { Component } from 'react';
-import { stores, axios, Content } from '@choerodon/boot';
+import { stores } from '@choerodon/boot';
 import _ from 'lodash';
 import {
   Modal, Form, Input, Checkbox,
 } from 'choerodon-ui';
 
 import './CopyIssue.less';
+import { epicApi, issueApi } from '@/api';
 
 const { AppState } = stores;
 const FormItem = Form.Item;
@@ -34,18 +35,19 @@ class CopyIssue extends Component {
           issueId, issue,
         } = this.props;
         const {
-          issueSummary, copySubIssue, copyLinkIssue, sprint,
+          issueSummary, issueName, copySubIssue, copyLinkIssue, sprint,
         } = values;
         const copyConditionVO = {
           issueLink: copyLinkIssue || false,
           sprintValues: sprint || false,
           subTask: copySubIssue || false,
           summary: issueSummary || false,
+          epicName: issueName || false,
         };
         this.setState({
           loading: true,
         });
-        axios.post(`/agile/v1/projects/${projectId}/issues/${issueId}/clone_issue?organizationId=${orgId}&applyType=${applyType}&orgId=${orgId}`, copyConditionVO)
+        issueApi.clone(issueId, applyType, copyConditionVO)
           .then((res) => {
             this.setState({
               loading: false,
@@ -56,9 +58,24 @@ class CopyIssue extends Component {
     });
   };
 
+  checkEpicNameRepeat = (rule, value, callback) => {
+    if (value && value.trim()) {
+      epicApi.checkName(value)
+        .then((res) => {
+          if (res) {
+            callback('史诗名称重复');
+          } else {
+            callback();
+          }
+        });
+    } else {
+      callback();
+    }
+  };
+
   render() {
     const {
-      visible, onCancel, issueNum, issueSummary,
+      visible, onCancel, issueNum, issueSummary, issue,
     } = this.props;
     const { getFieldDecorator } = this.props.form;
 
@@ -87,11 +104,28 @@ class CopyIssue extends Component {
             )}
           </FormItem>
           {
+            issue.typeCode === 'issue_epic' && (
+            <FormItem style={{ marginTop: 20 }}>
+              {getFieldDecorator('issueName', {
+                rules: [{ required: true, message: '请输入史诗名称' },
+                  { validator: this.checkEpicNameRepeat }],
+                initialValue: issue.epicName,
+              })(
+                <Input
+                  ref={(input) => { this.textInput = input; }}
+                  label="名称"
+                  maxLength={20}
+                />,
+              )}
+            </FormItem>
+            )
+          }
+          {
             this.props.issue.closeSprint.length || this.props.issue.activeSprint ? (
               <FormItem>
                 {getFieldDecorator('sprint', {})(
                   <Checkbox>
-                    {'是否复制冲刺'}
+                    是否复制冲刺
                   </Checkbox>,
                 )}
               </FormItem>
@@ -102,7 +136,7 @@ class CopyIssue extends Component {
               <FormItem>
                 {getFieldDecorator('copySubIssue', {})(
                   <Checkbox>
-                    {'是否复制子任务'}
+                    是否复制子任务
                   </Checkbox>,
                 )}
               </FormItem>
@@ -113,7 +147,7 @@ class CopyIssue extends Component {
               <FormItem>
                 {getFieldDecorator('copyLinkIssue', {})(
                   <Checkbox>
-                    {'是否复制关联任务'}
+                    是否复制关联任务
                   </Checkbox>,
                 )}
               </FormItem>

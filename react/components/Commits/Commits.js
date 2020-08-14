@@ -1,9 +1,11 @@
+/* eslint-disable no-restricted-globals */
 import React, { Component } from 'react';
 import _ from 'lodash';
 import {
   Modal, Table, Tooltip, Popover, Button, Icon, 
 } from 'choerodon-ui';
-import { stores, Content, axios } from '@choerodon/boot';
+import { stores, Content } from '@choerodon/boot';
+import { devOpsApi } from '@/api';
 
 const { AppState } = stores;
 const { Sidebar } = Modal;
@@ -43,7 +45,7 @@ class Commits extends Component {
   loadCommits() {
     const { issueId } = this.props;
     this.setState({ loading: true });
-    axios.get(`/devops/v1/project/${AppState.currentMenuType.id}/issue/${issueId}/commit/list`)
+    devOpsApi.loadCommit(issueId)
       .then((res) => {
         this.setState({
           commits: res,
@@ -54,9 +56,8 @@ class Commits extends Component {
 
   createMergeRequest(record) {
     const win = window.open('');
-    const projectId = AppState.currentMenuType.id;
     const { appServiceId } = record;
-    axios.get(`/devops/v1/projects/${projectId}/app_service/${appServiceId}/git/url`)
+    devOpsApi.loadGitUrl(appServiceId)
       .then((res) => {
         const url = `${res}/merge_requests/new?change_branches=true&merge_request[source_branch]=${record.branchName}&merge_request[target_branch]=master`;
         win.location.href = url;
@@ -134,21 +135,21 @@ class Commits extends Component {
               content={(
                 <div>
                   {
-                    record.mergeRequests && record.mergeRequests.length ? (
-                      <ul>
-                        {
-                          record.mergeRequests.map(v => (
-                            <li style={{ listStyleType: 'none' }}>
-                              <span style={{ display: 'inline-block', width: 150 }}>{v.title}</span>
-                              <span style={{ display: 'inline-block', width: 50 }}>{['opened', 'merged', 'closed'].includes(v.state) ? STATUS_SHOW[v.state] : ''}</span>
-                            </li>
-                          ))
-                        }
-                      </ul>
-                    ) : <div>暂无相关合并请求</div>
-                  }
+                  record.mergeRequests && record.mergeRequests.length ? (
+                    <ul>
+                      {
+                        record.mergeRequests.map(v => (
+                          <li style={{ listStyleType: 'none' }}>
+                            <span style={{ display: 'inline-block', width: 150 }}>{v.title}</span>
+                            <span style={{ display: 'inline-block', width: 50 }}>{['opened', 'merged', 'closed'].includes(v.state) ? STATUS_SHOW[v.state] : ''}</span>
+                          </li>
+                        ))
+                      }
+                    </ul>
+                  ) : <div>暂无相关合并请求</div>
+                }
                 </div>
-              )}
+)}
             >
               <p style={{
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 0, 

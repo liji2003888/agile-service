@@ -1,9 +1,12 @@
 package io.choerodon.agile.infra.dto;
 
-import io.choerodon.mybatis.entity.BaseDTO;
+
+import io.choerodon.mybatis.annotation.ModifyAudit;
+import io.choerodon.mybatis.annotation.VersionAudit;
+import io.choerodon.mybatis.domain.AuditDomain;
+import org.hzero.starter.keyencrypt.core.Encrypt;
 
 import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
@@ -12,7 +15,9 @@ import javax.persistence.Table;
  * Email: fuqianghuang01@gmail.com
  */
 @Table(name = "agile_issue_component")
-public class IssueComponentDTO extends BaseDTO {
+@ModifyAudit
+@VersionAudit
+public class IssueComponentDTO extends AuditDomain {
 
     public IssueComponentDTO() {}
 
@@ -22,7 +27,8 @@ public class IssueComponentDTO extends BaseDTO {
     }
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue
+    @Encrypt
     private Long componentId;
 
     private Long projectId;

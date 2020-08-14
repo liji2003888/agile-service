@@ -3,9 +3,10 @@ import {
   Modal, Table, Tooltip, Popover, Button, Icon,
 } from 'choerodon-ui';
 import {
-  stores, Content, axios, Choerodon,
+  stores, Content, Choerodon,
 } from '@choerodon/boot';
 import TimeAgo from 'timeago-react';
+import { devOpsApi } from '@/api';
 import UserHead from '../UserHead';
 
 const { AppState } = stores;
@@ -32,24 +33,21 @@ class MergeRequest extends Component {
   loadMergeRequest() {
     const { issueId } = this.props;
     this.setState({ loading: true });
-    axios.get(`/devops/v1/project/${AppState.currentMenuType.id}/issue/${issueId}/merge_request/list`)
-      .then((res) => {
-        this.setState({
-          mergeRequests: res,
-          loading: false,
-        });
+    devOpsApi.loadMergeRequest(issueId).then((res) => {
+      this.setState({
+        mergeRequests: res,
+        loading: false,
       });
+    });
   }
 
   createMergeRequest(record) {
     const win = window.open('');
-    const projectId = AppState.currentMenuType.id;
     const { applicationId, gitlabMergeRequestId } = record;
-    axios.get(`/devops/v1/projects/${projectId}/app_service/${applicationId}/git/url`)
-      .then((res) => {
-        const url = `${res}/merge_requests/${gitlabMergeRequestId}`;
-        win.location.href = url;
-      })
+    devOpsApi.loadGitUrl(applicationId).then((res) => {
+      const url = `${res}/merge_requests/${gitlabMergeRequestId}`;
+      win.location.href = url;
+    })
       .catch((error) => {
       });
   }
@@ -86,7 +84,7 @@ class MergeRequest extends Component {
           <div style={{ width: '100%', overflow: 'hidden', flexShrink: 0 }}>
             <Tooltip placement="topLeft" mouseEnterDelay={0.5} title={title}>
               <p style={{
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 0
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 0,
               }}
               >
                 {title}
@@ -111,7 +109,7 @@ class MergeRequest extends Component {
         width: '20%',
         render: (authorId, record) => (
           <div style={{
-            width: '100%', overflow: 'hidden', flexShrink: 0, justifyContent: 'flex-start'
+            width: '100%', overflow: 'hidden', flexShrink: 0, justifyContent: 'flex-start',
           }}
           >
             <UserHead

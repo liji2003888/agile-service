@@ -1,26 +1,25 @@
 package io.choerodon.agile.app.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
+import io.choerodon.agile.api.vo.KnowledgeRelationVO;
 import io.choerodon.agile.api.vo.WikiRelationVO;
 import io.choerodon.agile.api.vo.WorkSpaceVO;
 import io.choerodon.agile.app.service.IWikiRelationService;
 import io.choerodon.agile.app.service.WikiRelationService;
-import io.choerodon.agile.infra.annotation.DataLog;
 import io.choerodon.agile.infra.dto.WikiRelationDTO;
 import io.choerodon.agile.infra.feign.KnowledgebaseClient;
 import io.choerodon.agile.infra.mapper.WikiRelationMapper;
-import io.choerodon.core.exception.CommonException;
+import io.choerodon.agile.infra.utils.BaseFieldUtil;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
-import org.modelmapper.convention.MatchingStrategies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
-import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -45,13 +44,8 @@ public class WikiRelationServiceImpl implements WikiRelationService {
 
     @Autowired
     private IWikiRelationService iWikiRelationService;
-
-    private ModelMapper modelMapper = new ModelMapper();
-
-    @PostConstruct
-    public void init() {
-        modelMapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
-    }
+    @Autowired
+    private ModelMapper modelMapper;
 
     private Boolean checkRepeat(WikiRelationDTO wikiRelationDTO) {
         WikiRelationDTO wikiRelation = new WikiRelationDTO();
@@ -69,14 +63,14 @@ public class WikiRelationServiceImpl implements WikiRelationService {
             for (WikiRelationDTO wikiRelationDTO : wikiRelationDTOList) {
                 if (!checkRepeat(wikiRelationDTO)) {
                     iWikiRelationService.createBase(wikiRelationDTO);
+                    BaseFieldUtil.updateIssueLastUpdateInfo(wikiRelationDTO.getIssueId(), wikiRelationDTO.getProjectId());
                 }
             }
         }
     }
 
     @Override
-    public JSONObject queryByIssueId(Long projectId, Long issueId) {
-        JSONObject jsonObject = new JSONObject();
+    public KnowledgeRelationVO queryByIssueId(Long projectId, Long issueId) {
         WikiRelationDTO wikiRelationDTO = new WikiRelationDTO();
         wikiRelationDTO.setIssueId(issueId);
         List<WikiRelationDTO> wikiRelationDTOList = wikiRelationMapper.select(wikiRelationDTO);
@@ -91,16 +85,27 @@ public class WikiRelationServiceImpl implements WikiRelationService {
                 result.add(wikiRelationVO);
             }
         }
-        jsonObject.put("knowledgeRelationList", result);
-        return jsonObject;
+        KnowledgeRelationVO knowledgeRelation = new KnowledgeRelationVO();
+        knowledgeRelation.setKnowledgeRelationList(result);
+        return knowledgeRelation;
     }
 
     @Override
-    @DataLog(type = "knowledgeRelationDelete")
+    public void deleteByWorkSpaceId(Long projectId, Long workSpaceId) {
+        WikiRelationDTO wikiRelationDTO = new WikiRelationDTO();
+        wikiRelationDTO.setSpaceId(workSpaceId);
+        List<WikiRelationDTO> wikiRelationDTOS = wikiRelationMapper.select(wikiRelationDTO);
+        if(!CollectionUtils.isEmpty(wikiRelationDTOS)){
+            wikiRelationDTOS.forEach(v -> iWikiRelationService.deleteBase(wikiRelationDTO));
+        }
+    }
+
+    @Override
     public void deleteById(Long projectId, Long id) {
         WikiRelationDTO wikiRelationDTO = new WikiRelationDTO();
         wikiRelationDTO.setProjectId(projectId);
         wikiRelationDTO.setId(id);
         iWikiRelationService.deleteBase(wikiRelationDTO);
+        BaseFieldUtil.updateIssueLastUpdateInfo(wikiRelationDTO.getIssueId(), projectId);
     }
 }

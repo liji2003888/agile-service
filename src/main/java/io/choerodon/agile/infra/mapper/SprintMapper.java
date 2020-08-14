@@ -1,7 +1,7 @@
 package io.choerodon.agile.infra.mapper;
 
 import io.choerodon.agile.infra.dto.*;
-import io.choerodon.mybatis.common.Mapper;
+import io.choerodon.mybatis.common.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.math.BigDecimal;
@@ -12,7 +12,7 @@ import java.util.Set;
 /**
  * Created by jian_zhang02@163.com on 2018/5/15.
  */
-public interface SprintMapper extends Mapper<SprintDTO> {
+public interface SprintMapper extends BaseMapper<SprintDTO> {
     List<SprintNameDTO> queryNameByOptions(@Param("projectId") Long projectId, @Param("sprintStatusCodes") List<String> sprintStatusCodes);
 
     /**
@@ -34,7 +34,7 @@ public interface SprintMapper extends Mapper<SprintDTO> {
 
     String queryMinRank(@Param("projectId") Long projectId, @Param("sprintId") Long sprintId);
 
-    List<SprintSearchDTO> queryPlanSprint(@Param("projectId") Long projectId, @Param("issueIds") List<Long> issueIds);
+    List<SprintSearchDTO> queryPlanSprint(@Param("projectId") Long projectId, @Param("issueIds") Set<Long> issueIds);
 
     int queryIssueCount(@Param("projectId") Long projectId, @Param("sprintId") Long sprintId);
 
@@ -54,7 +54,7 @@ public interface SprintMapper extends Mapper<SprintDTO> {
 
     List<Long> queryIssueIds(@Param("projectId") Long projectId, @Param("sprintId") Long sprintId);
 
-    Set<Long> queryAssigneeIdsByIssueIds(@Param("projectId") Long projectId, @Param("issueIds") List<Long> issueIds);
+    Set<Long> queryAssigneeIdsByIssueIds(@Param("projectId") Long projectId, @Param("issueIds") Set<Long> issueIds);
 
     List<Long> queryAllRankIssueIds(@Param("projectId") Long projectId, @Param("sprintId") Long sprintId);
 
@@ -98,6 +98,16 @@ public interface SprintMapper extends Mapper<SprintDTO> {
      */
     List<AssigneeIssueDTO> queryAssigneeIssueByActiveSprintId(@Param("projectId") Long projectId, @Param("sprintId") Long sprintId);
 
+
+    /**
+     * 根据issueids活跃冲刺的经办人统计信息
+     *
+     * @param projectId projectId
+     * @param sprintId  sprintId
+     * @return AssigneeIssueDTO
+     */
+    List<AssigneeIssueDTO> queryAssigneeIssueByActiveSprintIdAndIssueIds(@Param("projectId") Long projectId, @Param("sprintId") Long sprintId, @Param("issueIds") List<Long> issueIds);
+
     /**
      * 查询活跃冲刺的issue列表
      *
@@ -118,4 +128,6 @@ public interface SprintMapper extends Mapper<SprintDTO> {
     List<SprintDTO> getSprintByProjectId(@Param("projectId") Long projectId);
 
     List<SprintDTO> selectNotDoneByProjectId(@Param("projectId") Long projectId);
+
+    List<AssigneeIssueDTO> queryAssigneeIssueByPlanSprintId(@Param("sprintIds") Set<Long> sprintIds, @Param("projectId") Long projectId, @Param("issueIds") List<Long> issueIds);
 }

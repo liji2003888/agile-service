@@ -1,7 +1,6 @@
 package io.choerodon.agile.app.service.impl;
 
-import com.github.pagehelper.PageHelper;
-import com.github.pagehelper.PageInfo;
+import io.choerodon.core.domain.Page;
 import io.choerodon.agile.api.vo.*;
 import io.choerodon.agile.api.vo.event.*;
 import io.choerodon.agile.app.service.*;
@@ -10,11 +9,11 @@ import io.choerodon.agile.infra.dto.*;
 import io.choerodon.agile.infra.enums.*;
 import io.choerodon.agile.infra.mapper.*;
 import io.choerodon.agile.infra.utils.PageUtil;
-import io.choerodon.web.util.PageableHelper;
-import org.springframework.data.domain.Pageable;
+import io.choerodon.mybatis.pagehelper.PageHelper;
+import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 import io.choerodon.core.exception.CommonException;
 import io.choerodon.core.oauth.DetailsHelper;
-import io.choerodon.mybatis.entity.Criteria;
+import org.hzero.mybatis.common.Criteria;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
 import org.slf4j.Logger;
@@ -22,6 +21,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.ObjectUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -80,17 +81,21 @@ public class StateMachineServiceImpl implements StateMachineService {
     private BoardColumnService boardColumnService;
     @Autowired
     private ModelMapper modelMapper;
+    @Autowired
+    private ColumnStatusRelMapper columnStatusRelMapper;
+    @Autowired
+    private IssueTypeMapper issueTypeMapper;
 
     @Override
-    public PageInfo<StateMachineListVO> pageQuery(Long organizationId, Pageable pageable, String name, String description, String param) {
+    public Page<StateMachineListVO> pageQuery(Long organizationId, PageRequest pageRequest, String name, String description, String param) {
         StateMachineDTO stateMachine = new StateMachineDTO();
         stateMachine.setName(name);
         stateMachine.setDescription(description);
         stateMachine.setOrganizationId(organizationId);
 
-        PageInfo<StateMachineDTO> page = PageHelper.startPage(pageable.getPageNumber(), pageable.getPageSize(), PageableHelper.getSortSql(pageable.getSort())).doSelectPageInfo(
+        Page<StateMachineDTO> page = PageHelper.doPageAndSort(pageRequest,
                 () -> stateMachineMapper.fulltextSearch(stateMachine, param));
-        List<StateMachineListVO> stateMachineVOS = modelMapper.map(page.getList(), new TypeToken<List<StateMachineListVO>>() {
+        List<StateMachineListVO> stateMachineVOS = modelMapper.map(page.getContent(), new TypeToken<List<StateMachineListVO>>() {
         }.getType());
         for (StateMachineListVO stateMachineVO : stateMachineVOS) {
             List<StateMachineSchemeVO> list = schemeService.querySchemeByStateMachineId(organizationId, stateMachineVO.getId());
@@ -208,9 +213,9 @@ public class StateMachineServiceImpl implements StateMachineService {
             }
         }
         stateMachine.setStatus(StateMachineStatus.ACTIVE);
-        Criteria criteria = new Criteria();
-        criteria.update(STATUS);
-        int stateMachineDeploy = stateMachineMapper.updateByPrimaryKeyOptions(stateMachine, criteria);
+//        Criteria criteria = new Criteria();
+//        criteria.update(STATUS);
+        int stateMachineDeploy = stateMachineMapper.updateOptional(stateMachine, STATUS);
         if (stateMachineDeploy != 1) {
             throw new CommonException("error.stateMachine.deploy");
         }
@@ -354,13 +359,28 @@ public class StateMachineServiceImpl implements StateMachineService {
             String applyType = projectConfig.getApplyType();
             count = count + issueMapper.querySizeByApplyTypeAndStatusId(projectId, applyType, statusId);
         }
-        if (count.equals(0L)) {
+        if (count.equals(0L) && checkStatusInBoardColumnBySm(projectConfigs, statusId)) {
             result.put("canDelete", true);
         } else {
             result.put("canDelete", false);
             result.put("count", count);
         }
         return result;
+    }
+
+    private Boolean checkStatusInBoardColumnBySm(List<ProjectConfigDTO> projectConfigs, Long statusId) {
+        if (projectConfigs != null && !projectConfigs.isEmpty()) {
+            for (ProjectConfigDTO projectConfigDTO : projectConfigs) {
+                ColumnStatusRelDTO columnStatusRelDTO = new ColumnStatusRelDTO();
+                columnStatusRelDTO.setProjectId(projectConfigDTO.getProjectId());
+                columnStatusRelDTO.setStatusId(statusId);
+                List<ColumnStatusRelDTO> columnStatusRelDTOList = columnStatusRelMapper.select(columnStatusRelDTO);
+                if (columnStatusRelDTOList != null && !columnStatusRelDTOList.isEmpty()) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     @Override
@@ -397,6 +417,76 @@ public class StateMachineServiceImpl implements StateMachineService {
         //找到与状态机关联的状态机方案
         List<Long> schemeIds = stateMachineSchemeConfigService.querySchemeIdsByStateMachineId(false, organizationId, stateMachineId);
         return handleStateMachineChangeStatusBySchemeIds(organizationId, stateMachineId, null, schemeIds, changeStatus);
+    }
+
+    @Override
+    public Long copyStateMachine(Long organizationId, Long currentStateMachineId,Long issueTypeId) {
+        StateMachineDTO stateMachineDTO = stateMachineMapper.queryById(organizationId, currentStateMachineId);
+        if (ObjectUtils.isEmpty(stateMachineDTO)) {
+            throw new CommonException("error.query.state.machine.null");
+        }
+        StateMachineDTO map = modelMapper.map(stateMachineDTO, StateMachineDTO.class);
+        IssueTypeDTO issueTypeDTO = issueTypeMapper.selectByPrimaryKey(issueTypeId);
+        map.setDefault(false);
+        map.setId(null);
+        map.setName(map.getName()+"-"+issueTypeDTO.getTypeCode());
+        stateMachineMapper.insert(map);
+        Long stateMachineId = map.getId();
+        Long userId = DetailsHelper.getUserDetails().getUserId();
+        List<StateMachineNodeVO> stateMachineNodeVOS = nodeService.queryByStateMachineId(organizationId, currentStateMachineId, false);
+        // 复制node
+        List<Long> nodeIds = new ArrayList<>();
+        List<StateMachineNodeDTO> nodeList = new ArrayList<>();
+        stateMachineNodeVOS.forEach(v -> {
+            nodeIds.add(v.getId());
+            StateMachineNodeDTO stateMachineNode = modelMapper.map(v, StateMachineNodeDTO.class);
+            stateMachineNode.setId(null);
+            stateMachineNode.setOrganizationId(organizationId);
+            stateMachineNode.setStateMachineId(stateMachineId);
+            stateMachineNode.setCreatedBy(userId);
+            stateMachineNode.setLastUpdatedBy(userId);
+            nodeList.add(stateMachineNode);
+        });
+        if (CollectionUtils.isEmpty(nodeList)) {
+            return null;
+        }
+        nodeDeployMapper.batchInsert(nodeList);
+        Map<Long, Long> nodeChangeMap = getChangeMap(nodeIds, nodeList.stream().map(StateMachineNodeDTO::getId).collect(Collectors.toList()));
+        // 复制transform
+        List<Long> transformIds = new ArrayList<>();
+        List<StateMachineTransformDTO> stateMachineTransformDTO = transformDeployMapper.queryByStateMachineIds(organizationId, Arrays.asList(currentStateMachineId));
+        List<StateMachineTransformDTO> newStateMachineTransformDTO = new ArrayList<>();
+        stateMachineTransformDTO.forEach(transform -> {
+            transformIds.add(transform.getId());
+            StateMachineTransformDTO transformCopy = modelMapper.map(transform, StateMachineTransformDTO.class);
+            transformCopy.setId(null);
+            transformCopy.setStateMachineId(stateMachineId);
+            transformCopy.setStartNodeId(transform.getStartNodeId() == 0 ? transform.getStartNodeId() : nodeChangeMap.get(transform.getStartNodeId()));
+            transformCopy.setEndNodeId(transform.getEndNodeId() == 0 ? transform.getEndNodeId() : nodeChangeMap.get(transform.getEndNodeId()));
+            transformCopy.setCreatedBy(userId);
+            transformCopy.setLastUpdatedBy(userId);
+            newStateMachineTransformDTO.add(transformCopy);
+        });
+        transformDeployMapper.batchInsert(newStateMachineTransformDTO);
+        Map<Long, Long> transformMap = getChangeMap(transformIds, newStateMachineTransformDTO.stream().map(StateMachineTransformDTO::getId).collect(Collectors.toList()));
+        // 更新node的all_status_transform_id字段
+        nodeList.forEach(node -> {
+            Long allStatusTransformId = node.getAllStatusTransformId();
+            if (!ObjectUtils.isEmpty(allStatusTransformId)) {
+                node.setAllStatusTransformId(transformMap.get(allStatusTransformId));
+                nodeDeployMapper.updateOptional(node, "allStatusTransformId");
+            }
+        });
+        return stateMachineId;
+    }
+
+    private Map<Long, Long> getChangeMap(List<Long> oldIds, List<Long> newIds) {
+        Map<Long, Long> map = new HashMap<>();
+        for (Long id:oldIds) {
+            int index = oldIds.indexOf(id);
+            map.put(id,newIds.get(index));
+        }
+        return map;
     }
 
     @Override
@@ -665,9 +755,9 @@ public class StateMachineServiceImpl implements StateMachineService {
             throw new CommonException("error.stateMachine.deleteDraft.noFound");
         }
         stateMachine.setStatus(StateMachineStatus.ACTIVE);
-        Criteria criteria = new Criteria();
-        criteria.update(STATUS);
-        int stateMachineDeploy = stateMachineMapper.updateByPrimaryKeyOptions(stateMachine, criteria);
+//        Criteria criteria = new Criteria();
+//        criteria.update(STATUS);
+        int stateMachineDeploy = stateMachineMapper.updateOptional(stateMachine, STATUS);
         if (stateMachineDeploy != 1) {
             throw new CommonException("error.stateMachine.deleteDraft");
         }
@@ -774,9 +864,9 @@ public class StateMachineServiceImpl implements StateMachineService {
         StateMachineDTO stateMachine = stateMachineMapper.queryById(organizationId, stateMachineId);
         if (stateMachine != null && stateMachine.getStatus().equals(StateMachineStatus.ACTIVE)) {
             stateMachine.setStatus(StateMachineStatus.DRAFT);
-            Criteria criteria = new Criteria();
-            criteria.update(STATUS);
-            int stateMachineUpdate = stateMachineMapper.updateByPrimaryKeyOptions(stateMachine, criteria);
+//            Criteria criteria = new Criteria();
+//            criteria.update(STATUS);
+            int stateMachineUpdate = stateMachineMapper.updateOptional(stateMachine, STATUS);
             if (stateMachineUpdate != 1) {
                 throw new CommonException("error.stateMachine.update");
             }
@@ -817,9 +907,9 @@ public class StateMachineServiceImpl implements StateMachineService {
                 //更新状态机状态为create
                 Long stateMachineId = stateMachine.getId();
                 stateMachine.setStatus(StateMachineStatus.CREATE);
-                Criteria criteria = new Criteria();
-                criteria.update(STATUS);
-                stateMachineMapper.updateByPrimaryKeyOptions(stateMachine, criteria);
+//                Criteria criteria = new Criteria();
+//                criteria.update(STATUS);
+                stateMachineMapper.updateOptional(stateMachine, STATUS);
                 //删除发布节点
                 StateMachineNodeDTO node = new StateMachineNodeDTO();
                 node.setStateMachineId(stateMachineId);

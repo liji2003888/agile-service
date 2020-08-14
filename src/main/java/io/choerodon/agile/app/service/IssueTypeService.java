@@ -1,7 +1,8 @@
 package io.choerodon.agile.app.service;
 
-import com.github.pagehelper.PageInfo;
-import org.springframework.data.domain.Pageable;
+import io.choerodon.core.domain.Page;
+import io.choerodon.agile.infra.dto.IssueTypeDTO;
+import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 import io.choerodon.agile.api.vo.IssueTypeSearchVO;
 import io.choerodon.agile.api.vo.IssueTypeVO;
 import io.choerodon.agile.api.vo.IssueTypeWithInfoVO;
@@ -26,7 +27,7 @@ public interface IssueTypeService {
 
     Map<String, Object> checkDelete(Long organizationId, Long issueTypeId);
 
-    PageInfo<IssueTypeWithInfoVO> queryIssueTypeList(Pageable pageable, Long organizationId, IssueTypeSearchVO issueTypeSearchVO);
+    Page<IssueTypeWithInfoVO> queryIssueTypeList(PageRequest pageRequest, Long organizationId, IssueTypeSearchVO issueTypeSearchVO);
 
     Boolean checkName(Long organizationId, String name, Long id);
 
@@ -50,4 +51,14 @@ public interface IssueTypeService {
     Map<Long, IssueTypeVO> listIssueTypeMap(Long organizationId);
 
     Map<Long, Map<String, Long>> initIssueTypeData(Long organizationId, List<Long> orgIds);
+
+    IssueTypeDTO createIssueType(IssueTypeDTO issueType);
+
+    /**
+     * 查询issueType map, key为typeCode, value为id
+     * @param organizationId
+     * @return
+     */
+    Map<String, Long> queryIssueTypeMap(Long organizationId);
+
 }

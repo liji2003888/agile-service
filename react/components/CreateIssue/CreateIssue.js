@@ -1,17 +1,25 @@
 import React, { Component, Fragment } from 'react';
-import { stores, Content } from '@choerodon/boot';
+import {
+  stores, Content, Choerodon, 
+} from '@choerodon/boot';
 import { map, find } from 'lodash';
 import {
   Select, Form, Input, Button, Modal, Spin,
 } from 'choerodon-ui';
 import moment from 'moment';
+import reactComponentDebounce from '@/components/DebounceComponent';
+import {
+  featureApi, epicApi, fieldApi, issueTypeApi, 
+} from '@/api';
+import {
+  beforeTextUpload, handleFileUpload, validateFile, normFile, 
+} from '@/utils/richText';
+import {
+  getProjectName, getProjectId,
+} from '@/utils/common';
+import { issueApi } from '@/api';
 import { UploadButton } from '../CommonComponent';
-import {
-  handleFileUpload, beforeTextUpload, validateFile, normFile, getProjectName, getProjectId,
-} from '../../common/utils';
-import {
-  createIssue, getFields, createFieldValue, loadIssue, loadIssueTypes,
-} from '../../api/NewIssueApi';
+import IsInProgramStore from '../../stores/common/program/IsInProgramStore';
 import SelectNumber from '../SelectNumber';
 import WYSIWYGEditor from '../WYSIWYGEditor';
 import TypeTag from '../TypeTag';
@@ -19,6 +27,17 @@ import './CreateIssue.less';
 import SelectFocusLoad from '../SelectFocusLoad';
 import renderField from './renderField';
 import FieldIssueLinks from './FieldIssueLinks';
+import WSJF from './WSJF';
+import FieldTeam from './FieldTeam';
+
+const DebounceInput = reactComponentDebounce({
+  valuePropName: 'value',
+  triggerMs: 250,
+})(Input);
+const DebounceEditor = reactComponentDebounce({
+  valuePropName: 'value',
+  triggerMs: 250,
+})(WYSIWYGEditor);
 
 const { AppState } = stores;
 const { Sidebar } = Modal;
@@ -29,13 +48,13 @@ const bugDefaultDes = [{ attributes: { bold: true }, insert: '步骤' }, { inser
 const defaultProps = {
   mode: 'default',
   applyType: 'agile',
-  request: createIssue,
+  request: issueApi.create,
   defaultTypeCode: 'story',
   title: '创建问题',
   contentTitle: `在项目“${getProjectName()}”中创建问题`,
   contentDescription: '请在下面输入问题的详细信息，包含详细描述、人员信息、版本信息、进度预估、优先级等等。您可以通过丰富的任务描述帮助相关人员更快更全面的理解任务，同时更好的把控问题进度。',
   contentLink: 'http://v0-16.choerodon.io/zh/docs/user-guide/agile/agile/create-agile/',
-  hiddenFields: ['benfitHypothesis', 'acceptanceCritera', 'pi'],
+  hiddenFields: ['pi'],
 };
 function applyFilter(array, filters) {
   const Filters = [];
@@ -81,7 +100,7 @@ class CreateIssue extends Component {
   setDefaultSprint = () => {
     const { mode, parentIssueId, relateIssueId } = this.props;
     if (['sub_task', 'sub_bug'].includes(mode)) {
-      loadIssue(parentIssueId || relateIssueId).then((res) => {
+      issueApi.load(parentIssueId || relateIssueId).then((res) => {
         const { form: { setFieldsValue } } = this.props;
         const { activeSprint } = res;
         if (activeSprint) {
@@ -118,7 +137,7 @@ class CreateIssue extends Component {
           });
         }
       });
-      createFieldValue(res.issueId, 'agile_issue', fieldList);
+      fieldApi.createFieldValue(res.issueId, 'agile_issue', fieldList);
       if (fileList && fileList.length > 0) {
         const config = {
           issueType: res.statusId,
@@ -146,7 +165,7 @@ class CreateIssue extends Component {
 
   loadIssueTypes = () => {
     const { applyType } = this.props;
-    loadIssueTypes(applyType).then((res) => {
+    issueTypeApi.loadAllWithStateMachineId(applyType).then((res) => {
       if (res && res.length) {
         const defaultType = this.getDefaultType(res);
         const param = {
@@ -154,7 +173,7 @@ class CreateIssue extends Component {
           context: defaultType.typeCode,
           pageCode: 'agile_issue_create',
         };
-        getFields(param).then((fields) => {
+        fieldApi.getFields(param).then((fields) => {
           this.setState({
             fields,
             originIssueTypes: res,
@@ -176,7 +195,7 @@ class CreateIssue extends Component {
         const link = linkTypes[`${key}]`];
         const issues = linkIssues[`${key}]`];
         const [linkTypeId, isIn] = link.split('+');
-        
+
         if (issues) {
           issues.forEach((issueId) => {
             issueLinkCreateVOList.push({
@@ -185,9 +204,9 @@ class CreateIssue extends Component {
               in: isIn === 'true',
             });
           });
-        }  
+        }
       });
-    }   
+    }
     return issueLinkCreateVOList;
   }
 
@@ -198,7 +217,7 @@ class CreateIssue extends Component {
       originLabels,
       originIssueTypes,
     } = this.state;
-    form.validateFieldsAndScroll((err, values) => {
+    form.validateFieldsAndScroll(async (err, values) => {
       if (!err) {
         const {
           typeId,
@@ -222,9 +241,21 @@ class CreateIssue extends Component {
           linkIssues,
           keys,
           fileList,
-        } = values;   
-
+          userBusinessValue,
+          timeCriticality,
+          rrOeValue,
+          jobSize,
+          featureId,
+          teamProjectIds,
+        } = values;
         const { typeCode } = originIssueTypes.find(t => t.id === typeId);
+        if (typeCode === 'feature' && epicId) {
+          const hasSame = await featureApi.hasSameInEpicBySummary(summary, epicId);
+          if (hasSame) {
+            Choerodon.prompt('史诗下已含有同名特性');
+            return;
+          }
+        }
         const exitComponents = originComponents;
         const componentIssueRelVOList = map(componentIssueRel
           && componentIssueRel.filter(v => v && v.trim()), (component) => {
@@ -282,6 +313,14 @@ class CreateIssue extends Component {
             acceptanceCritera,
             featureType,
           },
+          wsjfVO: {
+            userBusinessValue,
+            timeCriticality,
+            rrOeValue,
+            jobSize,
+          },
+          featureId, // 特性字段
+          teamProjectIds,
         };
         this.setState({ createLoading: true });
         const deltaOps = description;
@@ -327,10 +366,10 @@ class CreateIssue extends Component {
     const issueTypes = applyFilter(originIssueTypes, [
       filterSubType, {
         filter: filterEpic,
-        apply: false,
+        apply: IsInProgramStore.isInProgram || mode === 'feature', // 在项目群下的子项目和创建feature时，把epic过滤掉
       }, {
         filter: filterFeature,
-        apply: true,
+        apply: mode !== 'program', // 在项目群中创建issue时不过滤feature类型
       }]);
     return issueTypes;
   }
@@ -341,6 +380,21 @@ class CreateIssue extends Component {
       [field]: defaultValue,
     });
   }
+
+  checkEpicNameRepeat = (rule, value, callback) => {
+    if (value && value.trim()) {
+      epicApi.checkName(value)
+        .then((res) => {
+          if (res) {
+            callback('史诗名称重复');
+          } else {
+            callback();
+          }
+        });
+    } else {
+      callback();
+    }
+  };
 
   getFieldComponent = (field) => {
     const { form, mode, hiddenIssueType } = this.props;
@@ -380,7 +434,7 @@ class CreateIssue extends Component {
                           context: typeCode,
                           pageCode: 'agile_issue_create',
                         };
-                        getFields(param, typeCode).then((res) => {
+                        fieldApi.getFields(param).then((res) => {
                           this.setState({
                             fields: res,
                           });
@@ -413,19 +467,20 @@ class CreateIssue extends Component {
                       {
                         ...this.getDefaultType(),
                         colour: '#3D5AFE',
-                        typeCode: 'business',
+                        featureType: 'business',
                         name: '特性',
                       }, {
                         ...this.getDefaultType(),
                         colour: '#FFCA28',
-                        typeCode: 'enabler',
+                        featureType: 'enabler',
                         name: '使能',
                       },
                     ].map(type => (
-                      <Option key={type.typeCode} value={type.typeCode}>
+                      <Option key={type.featureType} value={type.featureType}>
                         <TypeTag
                           data={type}
                           showName
+                          featureType={type.featureType}
                         />
                       </Option>
                     ))}
@@ -443,6 +498,7 @@ class CreateIssue extends Component {
                   type="user"
                   label="经办人"
                   style={{ flex: 1 }}
+                  loadWhenMount
                   getPopupContainer={triggerNode => triggerNode.parentNode}
                   allowClear
                 />,
@@ -506,14 +562,27 @@ class CreateIssue extends Component {
             )}
           </FormItem>
         );
+      case 'feature':
+        // 如果在项目群中则不显示史诗 目前 工作列表这边创建问题 不调用这个case
+        return (
+          <FormItem label="特性">
+            {getFieldDecorator('feature', {})(
+              <SelectFocusLoad
+                label="特性"
+                allowClear
+                type="feature"
+              />,
+            )}
+          </FormItem>
+        );
       case 'fixVersion':
         return (
-          <FormItem label="版本">
+          <FormItem label="修复的版本">
             {getFieldDecorator('fixVersionIssueRel', {
               rules: [{ transform: value => (value ? value.toString() : value) }],
             })(
               <SelectFocusLoad
-                label="版本"
+                label="修复的版本"
                 mode="multiple"
                 loadWhenMount
                 type="version"
@@ -522,19 +591,36 @@ class CreateIssue extends Component {
           </FormItem>
         );
       case 'epic':
-        return (
-          ['issue_epic', 'sub_task'].includes(newIssueTypeCode) ? null : (
-            <FormItem label="史诗">
-              {getFieldDecorator('epicId', {})(
+        // 如果在项目群中则不显示史诗
+        if (!IsInProgramStore.isInProgram) {
+          return (
+            ['issue_epic', 'sub_task'].includes(newIssueTypeCode) ? null : (
+              <FormItem label="史诗">
+                {getFieldDecorator('epicId', {})(
+                  <SelectFocusLoad
+                    label="史诗"
+                    allowClear
+                    type="epic"
+                  />,
+                )}
+              </FormItem>
+            )
+          );
+        } else if (IsInProgramStore.isShowFeature && newIssueTypeCode === 'story') {
+          return (
+            <FormItem label="特性">
+              {getFieldDecorator('featureId', {})(
                 <SelectFocusLoad
-                  label="史诗"
+                  label="特性"
                   allowClear
-                  type="epic"
+                  type="feature"
                 />,
               )}
             </FormItem>
-          )
-        );
+          );
+        } else {
+          return '';
+        }
       case 'component':
         return (
           ['sub_task'].includes(newIssueTypeCode) ? null : (
@@ -559,7 +645,7 @@ class CreateIssue extends Component {
             {getFieldDecorator('summary', {
               rules: [{ required: true, message: '概要为必输项', whitespace: true }],
             })(
-              <Input autoFocus={newIssueTypeCode !== 'issue_epic'} label="概要" maxLength={44} />,
+              <DebounceInput autoFocus={newIssueTypeCode !== 'issue_epic'} label="概要" maxLength={44} />,
             )}
           </FormItem>
         );
@@ -572,7 +658,7 @@ class CreateIssue extends Component {
                   validator: this.checkEpicNameRepeat,
                 }],
               })(
-                <Input autoFocus label="史诗名称" maxLength={20} />,
+                <DebounceInput autoFocus label="史诗名称" maxLength={20} />,
               )}
             </FormItem>
           )
@@ -610,7 +696,7 @@ class CreateIssue extends Component {
               {getFieldDecorator(fieldCode, {
                 initialValue: newIssueTypeCode === 'bug' ? bugDefaultDes : undefined,
               })(
-                <WYSIWYGEditor
+                <DebounceEditor
                   style={{ height: 200, width: '100%' }}
                 />,
               )}
@@ -633,7 +719,7 @@ class CreateIssue extends Component {
           <FormItem key={field.id}>
             {getFieldDecorator('benfitHypothesis', {
             })(
-              <Input label="特性价值" placeholder="请输入特性价值" maxLength={100} />,
+              <DebounceInput label="特性价值" maxLength={100} />,
             )}
           </FormItem>
         );
@@ -642,7 +728,7 @@ class CreateIssue extends Component {
           <FormItem key={field.id}>
             {getFieldDecorator('acceptanceCritera', {
             })(
-              <Input label="验收标准" placeholder="请输入验收标准" maxLength={100} />,
+              <DebounceInput label="验收标准" maxLength={100} />,
             )}
           </FormItem>
         );
@@ -662,6 +748,7 @@ class CreateIssue extends Component {
           <FormItem label={fieldName} style={{ width: 330 }}>
             {getFieldDecorator(fieldCode, {
               rules: [{ required, message: `${fieldName}为必填项` }],
+              getValueFromEvent: fieldType === 'number' ? value => (value ? String(value) : undefined) : undefined,
               initialValue: this.transformValue(fieldType, defaultValue),
             })(
               renderField(field),
@@ -749,6 +836,7 @@ class CreateIssue extends Component {
     const {
       createLoading, fields, loading, newIssueTypeCode,
     } = this.state;
+
     return (
       <Sidebar
         className="c7n-createIssue"
@@ -770,8 +858,10 @@ class CreateIssue extends Component {
                   </FormItem>
                 )}
                 {fields && fields.filter(field => !hiddenFields.includes(field.fieldCode)).map(field => <span key={field.id}>{this.getFieldComponent(field)}</span>)}
+                {newIssueTypeCode === 'feature' && <FieldTeam form={form} />}
+                {newIssueTypeCode === 'feature' && <WSJF getFieldDecorator={form.getFieldDecorator} />}                            
               </div>
-              {mode !== 'feature' && newIssueTypeCode !== 'issue_epic' && <FieldIssueLinks form={form} />}
+              {mode !== 'feature' && mode !== 'sub_task' && !['issue_epic', 'feature'].includes(newIssueTypeCode) && <FieldIssueLinks form={form} />}
             </Form>
           </Spin>
         </Content>

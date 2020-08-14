@@ -1,6 +1,10 @@
 package io.choerodon.agile.infra.dto;
 
-import io.choerodon.mybatis.entity.BaseDTO;
+
+import io.choerodon.mybatis.annotation.ModifyAudit;
+import io.choerodon.mybatis.annotation.VersionAudit;
+import io.choerodon.mybatis.domain.AuditDomain;
+import org.hzero.starter.keyencrypt.core.Encrypt;
 
 import javax.persistence.*;
 
@@ -9,9 +13,12 @@ import javax.persistence.*;
  * @since 2019/4/1
  */
 @Table(name = "fd_page")
-public class PageDTO extends BaseDTO {
+@ModifyAudit
+@VersionAudit
+public class PageDTO extends AuditDomain {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue
+    @Encrypt
     private Long id;
     private String name;
     private String description;

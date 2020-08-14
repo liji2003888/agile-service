@@ -4,13 +4,15 @@ import com.alibaba.fastjson.JSONObject;
 import io.choerodon.agile.api.vo.*;
 import io.choerodon.agile.api.validator.IssueCommentValidator;
 import io.choerodon.agile.app.service.IssueCommentService;
+
 import io.choerodon.agile.infra.utils.VerifyUpdateUtil;
-import io.choerodon.core.annotation.Permission;
-import io.choerodon.core.enums.ResourceType;
+import io.choerodon.core.iam.ResourceLevel;
+import io.choerodon.swagger.annotation.Permission;
 import io.choerodon.core.exception.CommonException;
-import io.choerodon.core.iam.InitRoleCode;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import org.hzero.starter.keyencrypt.core.Encrypt;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +38,7 @@ public class IssueCommentController {
     @Autowired
     private VerifyUpdateUtil verifyUpdateUtil;
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("创建issue评论")
     @PostMapping
     public ResponseEntity<IssueCommentVO> createIssueComment(@ApiParam(value = "项目id", required = true)
@@ -49,7 +51,7 @@ public class IssueCommentController {
                 .orElseThrow(() -> new CommonException("error.IssueComment.createIssueComment"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("更新issue评论")
     @PostMapping(value = "/update")
     public ResponseEntity<IssueCommentVO> updateIssueComment(@ApiParam(value = "项目id", required = true)
@@ -64,25 +66,25 @@ public class IssueCommentController {
                 .orElseThrow(() -> new CommonException("error.IssueComment.updateIssueComment"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("通过issueId查询issue评论列表")
     @GetMapping(value = "/{issueId}")
     public ResponseEntity<List<IssueCommentVO>> queryIssueCommentList(@ApiParam(value = "项目id", required = true)
                                                                        @PathVariable(name = "project_id") Long projectId,
                                                                       @ApiParam(value = "issueId", required = true)
-                                                                       @PathVariable Long issueId) {
+                                                                       @PathVariable @Encrypt Long issueId) {
         return Optional.ofNullable(issueCommentService.queryIssueCommentList(projectId, issueId))
                 .map(result -> new ResponseEntity<>(result, HttpStatus.OK))
                 .orElseThrow(() -> new CommonException("error.IssueComment.queryIssueCommentList"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("通过commentId删除")
     @DeleteMapping(value = "/{commentId}")
     public ResponseEntity deleteIssueComment(@ApiParam(value = "项目id", required = true)
                                              @PathVariable(name = "project_id") Long projectId,
                                              @ApiParam(value = "commentId", required = true)
-                                             @PathVariable Long commentId) {
+                                             @PathVariable @Encrypt Long commentId) {
         issueCommentService.deleteIssueComment(projectId, commentId);
         return new ResponseEntity(HttpStatus.NO_CONTENT);
     }

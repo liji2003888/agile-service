@@ -89,12 +89,12 @@ function PageHome(props) {
   }, []);
 
   return (
-    <Page 
+    <Page
       className={`${prefixCls}-home`}
       service={AppState.currentMenuType.type === 'project' ? [
-        'agile-service.project-page.pageQuery',
+        'choerodon.code.project.setting.page.ps.scheme',
       ] : [
-        'agile-service.page.pageQuery',
+        'choerodon.code.organization.setting.issue.page.ps.scheme',
       ]}
     >
       <Breadcrumb />

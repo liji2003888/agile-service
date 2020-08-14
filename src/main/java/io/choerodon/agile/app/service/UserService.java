@@ -1,6 +1,6 @@
 package io.choerodon.agile.app.service;
 
-import com.github.pagehelper.PageInfo;
+import io.choerodon.core.domain.Page;
 import io.choerodon.agile.api.vo.ProjectVO;
 import io.choerodon.agile.api.vo.RoleAssignmentSearchVO;
 import io.choerodon.agile.api.vo.RoleVO;
@@ -48,9 +48,24 @@ public interface UserService {
 
     List<RoleVO> listRolesWithUserCountOnProjectLevel(Long sourceId, RoleAssignmentSearchVO roleAssignmentSearchVO);
 
-    PageInfo<UserVO> pagingQueryUsersByRoleIdOnProjectLevel(int page, int size, Long roleId, Long sourceId, RoleAssignmentSearchVO roleAssignmentSearchVO);
+    Page<UserVO> pagingQueryUsersByRoleIdOnProjectLevel(int page, int size, Long roleId, Long sourceId, RoleAssignmentSearchVO roleAssignmentSearchVO);
 
     List<UserDTO> listUsersByIds(Long[] ids);
 
     ProjectVO getGroupInfoByEnableProject(Long organizationId, Long projectId);
+
+//    WebHookJsonSendDTO.User getWebHookUserById(Long userId);
+
+    /**
+     * 查询是否为项目所有者
+     *
+     * @param projectId
+     * @param userId
+     * @return
+     */
+    boolean isProjectOwner(Long projectId, Long userId);
+
+    List<UserVO> listUsersByRealNames(List<String> realNames, boolean onlyEnabled);
+
+    List<UserVO> listProjectAdminUsersByProjectId(Long projectId);
 }

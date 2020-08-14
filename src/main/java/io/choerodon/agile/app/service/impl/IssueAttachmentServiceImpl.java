@@ -3,18 +3,20 @@ package io.choerodon.agile.app.service.impl;
 import io.choerodon.agile.app.service.IIssueAttachmentService;
 import io.choerodon.agile.infra.dto.IssueAttachmentDTO;
 import io.choerodon.agile.infra.dto.TestCaseAttachmentDTO;
+import io.choerodon.agile.infra.feign.CustomFileRemoteService;
+import io.choerodon.agile.infra.utils.BaseFieldUtil;
+import io.choerodon.agile.infra.utils.ProjectUtil;
 import io.choerodon.core.exception.CommonException;
 import io.choerodon.agile.api.vo.IssueAttachmentVO;
 import io.choerodon.agile.app.service.IssueAttachmentService;
-import io.choerodon.agile.infra.feign.FileFeignClient;
 import io.choerodon.agile.infra.mapper.IssueAttachmentMapper;
+import org.hzero.boot.file.FileClient;
+import org.hzero.core.util.ResponseUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -26,6 +28,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -40,12 +43,8 @@ public class IssueAttachmentServiceImpl implements IssueAttachmentService {
 
     private static final String BACKETNAME = "agile-service";
 
-
-    private final FileFeignClient fileFeignClient;
-
     @Autowired
-    public IssueAttachmentServiceImpl(FileFeignClient fileFeignClient) {
-        this.fileFeignClient = fileFeignClient;
+    public IssueAttachmentServiceImpl() {
     }
 
     @Autowired
@@ -57,6 +56,15 @@ public class IssueAttachmentServiceImpl implements IssueAttachmentService {
     @Value("${services.attachment.url}")
     private String attachmentUrl;
 
+    @Autowired
+    private FileClient fileClient;
+
+    @Autowired
+    private CustomFileRemoteService customFileRemoteService;
+
+    @Autowired
+    private ProjectUtil projectUtil;
+
     @Override
     public void dealIssue(Long projectId, Long issueId, String fileName, String url) {
         IssueAttachmentDTO issueAttachmentDTO = new IssueAttachmentDTO();
@@ -66,6 +74,7 @@ public class IssueAttachmentServiceImpl implements IssueAttachmentService {
         issueAttachmentDTO.setUrl(url);
         issueAttachmentDTO.setCommentId(1L);
         iIssueAttachmentService.createBase(issueAttachmentDTO);
+        BaseFieldUtil.updateIssueLastUpdateInfo(issueAttachmentDTO.getIssueId(), issueAttachmentDTO.getProjectId());
     }
 
     @Override
@@ -77,33 +86,13 @@ public class IssueAttachmentServiceImpl implements IssueAttachmentService {
         return list;
     }
 
-//    @DataLog(type = "createAttachment")
-//    public IssueAttachmentDTO insertIssueAttachment(IssueAttachmentDTO issueAttachmentDTO) {
-//        if (issueAttachmentMapper.insert(issueAttachmentDTO) != 1) {
-//            throw new CommonException(INSERT_ERROR);
-//        }
-//        return issueAttachmentMapper.selectByPrimaryKey(issueAttachmentDTO.getAttachmentId());
-//    }
-
-//    @DataLog(type = "deleteAttachment")
-//    public Boolean deleteById(Long attachmentId) {
-//        IssueAttachmentDTO issueAttachmentDTO = issueAttachmentMapper.selectByPrimaryKey(attachmentId);
-//        if (issueAttachmentDTO == null) {
-//            throw new CommonException("error.attachment.get");
-//        }
-//        if (issueAttachmentMapper.delete(issueAttachmentDTO) != 1) {
-//            throw new CommonException("error.attachment.delete");
-//        }
-//        return true;
-//    }
-
     private String dealUrl(String url) {
         String dealUrl = null;
         try {
             URL netUrl = new URL(url);
             dealUrl = netUrl.getFile().substring(BACKETNAME.length() + 2);
         } catch (MalformedURLException e) {
-            throw new CommonException(e.getMessage());
+            throw new CommonException("error.malformed.url", e);
         }
         return dealUrl;
     }
@@ -114,11 +103,9 @@ public class IssueAttachmentServiceImpl implements IssueAttachmentService {
         if (files != null && !files.isEmpty()) {
             for (MultipartFile multipartFile : files) {
                 String fileName = multipartFile.getOriginalFilename();
-                ResponseEntity<String> response = fileFeignClient.uploadFile(BACKETNAME, fileName, multipartFile);
-                if (response == null || response.getStatusCode() != HttpStatus.OK) {
-                    throw new CommonException("error.attachment.upload");
-                }
-                dealIssue(projectId, issueId, fileName, dealUrl(response.getBody()));
+                Long organizationId = projectUtil.getOrganizationId(projectId);
+                String url = fileClient.uploadFile(organizationId, BACKETNAME, null, fileName, multipartFile);
+                dealIssue(projectId, issueId, fileName, dealUrl(url));
             }
         }
         IssueAttachmentDTO issueAttachmentDTO = new IssueAttachmentDTO();
@@ -142,11 +129,17 @@ public class IssueAttachmentServiceImpl implements IssueAttachmentService {
         if (issueAttachmentDTO == null) {
             throw new CommonException("error.attachment.get");
         }
+        if (!issueAttachmentDTO.getProjectId().equals(projectId)) {
+            throw new CommonException("error.project.id.does.not.correspond");
+        }
         Boolean result = iIssueAttachmentService.deleteBase(issueAttachmentDTO.getAttachmentId());
+        BaseFieldUtil.updateIssueLastUpdateInfo(issueAttachmentDTO.getIssueId(), issueAttachmentDTO.getProjectId());
         String url = null;
         try {
             url = URLDecoder.decode(issueAttachmentDTO.getUrl(), "UTF-8");
-            fileFeignClient.deleteFile(BACKETNAME, attachmentUrl + "/" + BACKETNAME + "/" + url);
+            String deleteUrl = attachmentUrl + "/" + BACKETNAME + "/" + url;
+            Long organizationId = projectUtil.getOrganizationId(projectId);
+            ResponseUtils.getResponse(customFileRemoteService.deleteFileByUrl(organizationId, BACKETNAME, Arrays.asList(deleteUrl)), String.class);
         } catch (Exception e) {
             LOGGER.error("error.attachment.delete", e);
         }
@@ -162,11 +155,9 @@ public class IssueAttachmentServiceImpl implements IssueAttachmentService {
         List<String> result = new ArrayList<>();
         for (MultipartFile multipartFile : files) {
             String fileName = multipartFile.getOriginalFilename();
-            ResponseEntity<String> response = fileFeignClient.uploadFile(BACKETNAME, fileName, multipartFile);
-            if (response == null || response.getStatusCode() != HttpStatus.OK) {
-                throw new CommonException("error.attachment.upload");
-            }
-            result.add(attachmentUrl + "/" + BACKETNAME + "/" + dealUrl(response.getBody()));
+            Long organizationId = projectUtil.getOrganizationId(projectId);
+            String url = fileClient.uploadFile(organizationId, BACKETNAME, null, fileName, multipartFile);
+            result.add(attachmentUrl + "/" + BACKETNAME + "/" + dealUrl(url));
         }
         return result;
     }

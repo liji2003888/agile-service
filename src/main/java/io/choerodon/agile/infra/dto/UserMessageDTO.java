@@ -1,6 +1,7 @@
 package io.choerodon.agile.infra.dto;
 
 import io.choerodon.agile.infra.utils.StringUtil;
+import org.hzero.starter.keyencrypt.core.Encrypt;
 
 /**
  * @author dinghuang123@gmail.com
@@ -18,6 +19,8 @@ public class UserMessageDTO {
     private String email;
 
     private Boolean ldap;
+    @Encrypt
+    private Long id;
 
     public UserMessageDTO(String name, String imageUrl, String email) {
         this.name = name;
@@ -32,6 +35,17 @@ public class UserMessageDTO {
         this.imageUrl = imageUrl;
         this.email = email;
         this.ldap = ldap;
+    }
+
+    public UserMessageDTO(String name, String loginName, String realName,
+                          String imageUrl, String email, Boolean ldap, Long id) {
+        this.name = name;
+        this.loginName = loginName;
+        this.realName = realName;
+        this.imageUrl = imageUrl;
+        this.email = email;
+        this.ldap = ldap;
+        this.id = id;
     }
 
     public String getLoginName() {
@@ -81,6 +95,14 @@ public class UserMessageDTO {
 
     public Boolean getLdap() {
         return ldap;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     @Override

@@ -24,9 +24,6 @@ class EditIssueStore {
     return this.fields;
   }
 
-  @observable issueTypes = [];
-
-  // issue attribute
   @observable doc = {};
 
   @observable workLogs = [];
@@ -38,14 +35,6 @@ class EditIssueStore {
   @observable branch = {};
 
   @observable testExecutes = [];
-
-  @action setIssueTypes(issueTypes) {
-    this.issueTypes = issueTypes;
-  }
-
-  @computed get getIssueTypes() {
-    return this.issueTypes;
-  }
 
   @action setDoc(data) {
     this.doc = data;
@@ -89,8 +78,8 @@ class EditIssueStore {
 
   @action initIssueAttribute(doc, workLogs, dataLogs, linkIssues, branch) {
     this.doc = doc;
-    this.workLogs = workLogs;
-    this.dataLogs = dataLogs;
+    this.workLogs = workLogs || [];
+    this.dataLogs = dataLogs || [];
     this.linkIssues = linkIssues || [];
     this.branch = branch || {};
   }
@@ -121,6 +110,8 @@ class EditIssueStore {
   @observable changeParentShow = false;
 
   @observable detailShow = false;
+
+  @observable wsjfDTOShow = true;
 
   @action setCreateBranchShow(data) {
     this.createBranchShow = data;
@@ -224,6 +215,14 @@ class EditIssueStore {
 
   @computed get getDetailShow() {
     return this.detailShow;
+  }
+
+  @action setWSJFDTOShow(wsjfDTOShow) {
+    this.wsjfDTOShow = wsjfDTOShow;
+  }
+
+  @computed get getWSJFDTOShow() {
+    return this.wsjfDTOShow;
   }
 }
 export default EditIssueStore;

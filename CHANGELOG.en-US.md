@@ -1,6 +1,62 @@
 # Changelog
 All notable changes about agile-service will be documented in this file.
 
+## [0.22.0] - 2020-08-01
+
+### Added
+
+- The page of worklist - all issues are presented at issue level.
+- Batch modification of issue is supported for the page of worklist - all issues.  
+- The page of worklist - all issues support all fields filtering, including all predefined fields and custom fields.
+- Agile Kanban supports full screen display.
+- Agile Kanban supports viewing multiple iterations.
+- The import issue can be imported according to the parent-child level of task - subtask and story - subtask.
+- Agile Kanban supports custom state order.
+- Add preset nails and enterprise wechat webhook templates for agile messages.  
+
+### Changed
+
+- The to-do epic sidebar is optimized to not display completed epics.
+- Optimize subtask details page: you can directly see the summary of the parent task.
+- Optimize agile service permissions.
+- Optimize the export problem performance.
+- Optimize team member workload display in the page of to-do.
+- Partial views style optimization. 
+- Partial report optimization.
+
+### Fixed
+
+- Fix the duplicate display of the sub text box picture paste of issue details.
+- Fix create state interface permission check error.
+
+
+## [0.21.0] - 2020-03-06
+
+### Added
+
+- Configure Kanban to support deletion status.
+- Import problem supports importing parent-child relationship. Users can import sub tasks at the same time when importing stories or tasks.
+- Agile message notification supports email mode.  
+
+### Changed
+
+- Optimize agile Kanban performance.
+- Optimize work list performance.
+- Optimization configuration Kanban status set to finished saving does not take effect.
+- Optimize the configuration of Kanban custom state order.
+- Optimize to-do mass drag problem quantity display.
+- Optimize the issue link page style.
+- Optimize custom field page styles.  
+
+### Fixed
+
+- Fix problem with story map full screen menu bar.
+- Fix the problem of no data after the iteration planning workbench is refreshed.
+- Fix issue details remaining estimated time names showing incorrect problems.
+- Fixed a problem where the story map epic could not view comments in certain situations.
+- Fix the problem of setting up the agile module owner to display undefined.
+  
+  
 ## [0.20.0] - 2019-12-20
 
 ### Added

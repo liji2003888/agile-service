@@ -1,18 +1,16 @@
 import React, { Component } from 'react';
-import PropTypes from 'prop-types';
 import {
-  Input, Icon, Checkbox, Popover, Spin, Select,
+  Input, Icon, Select, Tooltip,
 } from 'choerodon-ui';
 import { observer, inject } from 'mobx-react';
+import { configTheme } from '@/utils/common';
 import StoryMapStore from '../../../../../stores/project/StoryMap/StoryMapStore';
 import FiltersProvider from '../../../../../components/FiltersProvider';
-import Loading from '../../../../../components/Loading';
-import { configTheme } from '../../../../../common/utils';
 import ClickOutSide from '../../../../../components/CommonComponent/ClickOutSide';
 import IssueItem from './IssueItem';
 import './SideIssueList.less';
 
-const { Option, OptGroup } = Select;
+const { Option } = Select;
 @inject('HeaderStore')
 @FiltersProvider(['issueStatus', 'version'])
 @observer
@@ -50,7 +48,7 @@ class SideIssueList extends Component {
   }
 
   setFilter = (field, values) => {
-    StoryMapStore.handleSideFilterChange(field, values.map(Number));
+    StoryMapStore.handleSideFilterChange(field, values);
   }
 
   render() {
@@ -96,7 +94,11 @@ class SideIssueList extends Component {
           </Select>
           <Select
             {...configTheme({
-              list: versionList, primary: true,
+              list: versionList.concat({
+                value: '0',
+                text: '无版本',
+              }),
+              primary: true,
             })}
             allowClear
             mode="multiple"
@@ -104,8 +106,14 @@ class SideIssueList extends Component {
             onChange={this.setFilter.bind(this, 'versionList')}
             getPopupContainer={trigger => trigger.parentNode}
             placeholder="版本"
+            dropdownStyle={{
+              width: 180,
+            }}
           >
-            {versionList.map(({ text, value }) => <Option value={value}>{text}</Option>)}
+            {versionList.concat({
+              value: '0',
+              text: '无版本',
+            }).map(({ text, value }) => <Option value={value}><Tooltip title={text}>{text}</Tooltip></Option>)}
           </Select>
 
         </div>

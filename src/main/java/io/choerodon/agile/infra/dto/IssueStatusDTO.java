@@ -1,6 +1,8 @@
 package io.choerodon.agile.infra.dto;
 
-import io.choerodon.mybatis.entity.BaseDTO;
+import io.choerodon.mybatis.annotation.ModifyAudit;
+import io.choerodon.mybatis.annotation.VersionAudit;
+import io.choerodon.mybatis.domain.AuditDomain;
 
 import javax.persistence.*;
 
@@ -9,10 +11,14 @@ import javax.persistence.*;
  * Email: fuqianghuang01@gmail.com
  */
 @Table(name = "agile_issue_status")
-public class IssueStatusDTO extends BaseDTO {
+@ModifyAudit
+@VersionAudit
+public class IssueStatusDTO extends AuditDomain {
+    public static final String FIELD_PROJECT_ID = "projectId";
+    public static final String FILED_IS_COMPLETED = "completed";
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue
     private Long id;
 
     private Long projectId;

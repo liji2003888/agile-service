@@ -1,7 +1,4 @@
-/* eslint-disable no-mixed-operators */
-/* eslint-disable consistent-return */
-/* eslint-disable react/no-unused-state */
-import React, { Component } from 'react';
+import React, { Component, createRef } from 'react';
 import { observer } from 'mobx-react';
 import echarts from 'echarts/lib/echarts';
 import ReactEchartsCore from 'echarts-for-react/lib/core';
@@ -13,10 +10,10 @@ import {
   Page, Header, Content, stores, axios, Breadcrumb,
 } from '@choerodon/boot';
 import {
-  Button, Select, Icon, Spin, Tooltip, DatePicker,
+  Button, Select, Icon, Spin, Tooltip,
 } from 'choerodon-ui';
 import './pie.less';
-import { reduce } from 'zrender/lib/core/util';
+import { sprintApi, versionApi } from '@/api';
 import SwitchChart from '../../Component/switchChart';
 import VersionReportStore from '../../../../stores/project/versionReport/VersionReport';
 import NoDataComponent from '../../Component/noData';
@@ -24,19 +21,17 @@ import pic from '../../../../assets/image/emptyChart.svg';
 
 const { Option } = Select;
 const { AppState } = stores;
-const { RangePicker } = DatePicker;
-let backUrl;
+
 
 @observer
 class ReleaseDetail extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      colors: [],
       type: '',
       value: '',
+      // eslint-disable-next-line react/no-unused-state
       showOtherTooltip: false,
-      linkFromParamUrl: undefined,
       sprintAndVersion: {
         sprint: [],
         version: [],
@@ -60,16 +55,15 @@ class ReleaseDetail extends Component {
       startDate: '',
       endDate: '',
     };
+    this.otherTooltipRef = createRef();
   }
 
   componentDidMount = async () => {
-    const Request = this.GetRequest(this.props.location.search);
-    backUrl = Request.paramUrl || 'reporthost';
     const value = this.getSelectDefaultValue();
     await VersionReportStore.getPieDatas(AppState.currentMenuType.id, value);
     await axios.all([
-      axios.post(`/agile/v1/projects/${AppState.currentMenuType.id}/sprint/names`, ['started', 'closed']),
-      axios.post(`/agile/v1/projects/${AppState.currentMenuType.id}/product_version/names`),
+      sprintApi.loadSprints(['started', 'closed']),
+      versionApi.loadNamesByStatus(),
     ])
       .then(axios.spread((sprints, versions) => {
         this.setState({
@@ -89,6 +83,7 @@ class ReleaseDetail extends Component {
     pieChart.on('mouseout', (params) => {
       if (params.data.name === '其它') {
         this.setState({
+          // eslint-disable-next-line react/no-unused-state
           showOtherTooltip: false,
         });
       }
@@ -120,19 +115,6 @@ class ReleaseDetail extends Component {
     return str[0].toUpperCase();
   };
 
-  isShowOtherToolTip(e) {
-    this.setState({
-      showOtherTooltip: true,
-    });
-    const otherTooptipItem = document.getElementsByClassName('pie-otherTooptip-item-percent');
-    let opacity = 0.9;
-    for (let i = 0; i < otherTooptipItem.length; i += 1) {
-      opacity = 1 - i * 0.1 > 0 ? 1 - i * 0.1 : 0.9;
-      otherTooptipItem[i].style.backgroundColor = `rgba(250,211,82,${opacity})`;
-    }
-    // e.stopPropageation();
-  }
-
   getSelectDefaultValue = () => {
     const { location: { pathname } } = this.props;
     const quaryLinks = [
@@ -162,28 +144,25 @@ class ReleaseDetail extends Component {
     const { colors } = VersionReportStore;
     const datas = VersionReportStore.pieData;
     return {
-      // title : {
-      //   text: '某站点用户访问来源',
-      //   subtext: '统计图',
-      //   x:'center'
-      // },
-      // color:['#9665E2','#F7667F','#FAD352', '#45A3FC','#56CA77'],
       color: colors,
       tooltip: {
         trigger: 'item',
-        // formatter: '问题: {c} {a} <br/>{b} : {d}%',
-        // formatter: value => (
-        //   `<div>
-        //       <span>问题：${value.data.value}</span><br/>
-        //       <span>百分比：${(value.data.percent.toFixed(2))}%</span>
-        //     </div>`
-        // ),
         formatter: (value) => {
           if (value.data.name !== '其它') {
-            this.setState({ showOtherTooltip: false });
+            if (this.otherTooltipRef && this.otherTooltipRef.current) {
+              this.otherTooltipRef.current.style.display = 'none';
+            }
             return `<div><span>问题：${value.data.value} 个</span><br/><span>百分比：${(value.data.percent.toFixed(2))}%</span></div>`;
           } else {
-            this.isShowOtherToolTip();
+            if (this.otherTooltipRef && this.otherTooltipRef.current) {
+              this.otherTooltipRef.current.style.display = 'block';
+              const otherTooptipItem = document.getElementsByClassName('pie-otherTooptip-item-percent');
+              let opacity = 0.9;
+              for (let i = 0; i < otherTooptipItem.length; i += 1) {
+                opacity = 1 - i * 0.1 > 0 ? 1 - i * 0.1 : 0.9;
+                otherTooptipItem[i].style.backgroundColor = `rgba(250,211,82,${opacity})`;
+              }
+            }
             return '';
           }
         },
@@ -202,17 +181,10 @@ class ReleaseDetail extends Component {
         {
           name: '',
           type: 'pie',
-          // radius: '55%',
-          // hoverAnimation: false,
           startAngle: 245,
           center: ['50%', '47%'],
           data: datas,
-          // labelLine: {
-          //   length: 100,
-          //   length2: 200,
-          // },
           label: {
-            // fontSize: '13px',
             color: 'rgba(0,0,0,0.65)',
             position: 'outside',
 
@@ -220,22 +192,15 @@ class ReleaseDetail extends Component {
               if (value.data.name === null) {
                 return '未分配';
               }
-              // if (value.data.name === '其它') {
-              //   return '';
-              // }
+              return value.data.name;
             },
           },
           itemStyle: {
             normal: {
-              // borderRadius: 18,
               borderWidth: 2,
               borderColor: '#ffffff',
             },
-            // color: (data) => {
-            //   return this.state.colors[data.dataIndex];
-            // }
           },
-
         },
       ],
     };
@@ -255,7 +220,6 @@ class ReleaseDetail extends Component {
   };
 
   changeType = (value, option) => {
-    // VersionReportStore.setPieData([]);
     this.setState({
       type: option.key,
       value,
@@ -409,11 +373,12 @@ class ReleaseDetail extends Component {
         );
       }
     }
+    return '';
   }
 
   renderChooseDimension = () => {
     const {
-      value, showOtherTooltip, sprintAndVersion, currentChooseDimension, currentSprintChoose, currentVersionChoose, startDate, endDate,
+      sprintAndVersion, currentChooseDimension, currentSprintChoose, currentVersionChoose, 
     } = this.state;
     return (
       <div>
@@ -436,11 +401,11 @@ class ReleaseDetail extends Component {
               if (currentChooseDimension === 'sprint') {
                 return <Option key={item.sprintId} value={item.sprintId}>{item.sprintName}</Option>;
               }
+              return '';
             })
           }
         </Select>
       </div>
-
     );
   }
 
@@ -477,14 +442,10 @@ class ReleaseDetail extends Component {
 
   render() {
     const {
-      value, showOtherTooltip, chooseDimensionType, sprintAndVersion, currentChooseDimension, currentSprintChoose, currentVersionChoose, startDate, endDate,
+      value, chooseDimensionType, currentChooseDimension,
     } = this.state;
     const data = VersionReportStore.getPieData;
     const sourceData = VersionReportStore.getSourceData;
-    let total = 0;
-    for (let i = 0; i < data.length; i += 1) {
-      total += data[i].value;
-    }
     const colors = VersionReportStore.getColors;
     const urlParams = AppState.currentMenuType;
     const type = [
@@ -500,10 +461,9 @@ class ReleaseDetail extends Component {
     ];
 
     return (
-      <Page className="pie-chart">
+      <Page className="pie-chart" service={['choerodon.code.project.operation.chart.ps.choerodon.code.project.operation.chart.ps.piechart']}>
         <Header
           title="统计图"
-          // backPath={`/agile/${backUrl}?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}`}
           backPath={`/charts?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}`}
         >
           <SwitchChart
@@ -564,7 +524,7 @@ class ReleaseDetail extends Component {
                     option={this.getOption()}
                   />
 
-                  <div className="pie-otherTooltip" style={{ display: `${showOtherTooltip ? 'block' : 'none'}` }}>
+                  <div className="pie-otherTooltip" ref={this.otherTooltipRef} style={{ display: 'none' }}>
                     <div className="pie-otherTooltip-wrap" />
                     <div className="pie-otherTooltip-item-wrap">
                       {this.renderOtherTooltip()}
@@ -589,7 +549,7 @@ class ReleaseDetail extends Component {
                             <td style={{ width: '158px' }}>
                               <div className="pie-legend-icon" style={{ background: colors[index] }} />
                               <Tooltip title={item && item.name}>
-                                <div className="pie-legend-text">{item.name ? (item.realName && item.realName || item.name) : '未分配'}</div>
+                                <div className="pie-legend-text">{item.name ? (item.realName || item.name) : '未分配'}</div>
                               </Tooltip>
                             </td>
                             <td style={{ width: '62px' }}>
@@ -608,7 +568,7 @@ class ReleaseDetail extends Component {
                   </div>
                 </div>
               </React.Fragment>
-            ) : <NoDataComponent title="问题" links={[{ name: '问题管理', link: '/agile/issue' }]} img={pic} />}
+            ) : <NoDataComponent title="问题" links={[{ name: '问题管理', link: '/agile/work-list/issue' }]} img={pic} />}
           </Spin>
 
         </Content>

@@ -1,18 +1,15 @@
 import React, { Component } from 'react';
 import { observer, inject } from 'mobx-react';
 import { Choerodon } from '@choerodon/boot';
-import { withRouter } from 'react-router-dom';
 import moment from 'moment';
 import _ from 'lodash';
 import {
   Checkbox, Select, Input, TimePicker, Row, Col, Radio, DatePicker, InputNumber,
 } from 'choerodon-ui';
-import { injectIntl } from 'react-intl';
+import { userApi, fieldApi } from '@/api';
 import TextEditToggle from '../../../../TextEditToggle';
 import SelectFocusLoad from '../../../../SelectFocusLoad';
-import { updateFieldValue } from '../../../../../api/NewIssueApi';
 import UserHead from '../../../../UserHead';
-import { getUsers } from '../../../../../api/CommonApi';
 import './Field.less';
 
 
@@ -22,10 +19,10 @@ const { Text, Edit } = TextEditToggle;
 let sign = false;
 
 @inject('AppState')
-@observer class IssueField extends Component {
+@observer class Field extends Component {
   debounceFilterIssues = _.debounce((input) => {
     this.setState({ selectLoading: true });
-    getUsers(input).then((res) => {
+    userApi.getAllInProject(input).then((res) => {
       this.setState({
         originUsers: res.list,
         selectLoading: false,
@@ -40,10 +37,6 @@ let sign = false;
       originUsers: [],
       selectLoading: false,
     };
-  }
-
-  componentDidMount() {
-
   }
 
   handleChange = (e) => {
@@ -88,7 +81,7 @@ let sign = false;
         fieldType,
         value: newValue,
       };
-      updateFieldValue(issueId, fieldId, 'agile_issue', obj)
+      fieldApi.updateFieldValue(issueId, fieldId, 'agile_issue', obj)
         .then(() => {
           if (onUpdate) {
             onUpdate();
@@ -105,7 +98,7 @@ let sign = false;
       this.setState({
         selectLoading: true,
       });
-      getUsers(input).then((res) => {
+      userApi.getAllInProject(input).then((res) => {
         this.setState({
           originUsers: res.list,
           selectLoading: false,
@@ -115,40 +108,6 @@ let sign = false;
     } else {
       this.debounceFilterIssues(input);
     }
-  }
-
-  /**
-   * 获取必选字段默认值字符串
-   * @param {*} field 
-   */
-  getDefaultStr(field) {
-    const {
-      fieldType, valueStr, required, defaultValue, fieldOptions,
-    } = field;
-    if (valueStr !== null) {
-      return valueStr;// fieldType === 'radio'
-    } else if (required && defaultValue !== null) {
-      if (fieldType === 'radio' || fieldType === 'checkbox' || fieldType === 'single' || field.fieldType === 'multiple') {
-        const defaultArr = [...defaultValue];
-        if (defaultArr.length === 0) {
-          defaultArr.push(defaultValue);
-        }
-        const newValueStr = [...fieldOptions].filter(i => defaultArr.some(d => d === i.id))
-          .map(i => i.value).join();
-        return newValueStr;
-      } else if (fieldType === 'time') {
-        return defaultValue.substring(defaultValue.indexOf(' '));
-      } else if (fieldType === 'datetime') {
-        return defaultValue;
-      } else if (fieldType === 'date') {
-        return defaultValue.substring(0, defaultValue.indexOf(' '));
-      } else if (fieldType === 'number') {
-        return defaultValue;
-      } else if (fieldType === 'text' || fieldType === 'input') {
-        return defaultValue;
-      }
-    }
-    return false;
   }
 
   renderField = () => {
@@ -317,7 +276,7 @@ let sign = false;
           filterOption={false}
           defaultOption={field.valueStr || undefined}
           defaultOpen
-          allowClear
+          allowClear          
           onChange={e => this.handleChange(e)}
         />
       );
@@ -346,7 +305,7 @@ let sign = false;
   render() {
     const { field, disabled } = this.props;
     const {
-      fieldCode, fieldName, value, fieldType, valueStr, defaultValueObj, required, defaultValue,
+      fieldCode, fieldName, value, fieldType, valueStr, required,
     } = field;
 
     return (
@@ -359,21 +318,22 @@ let sign = false;
         <div className="c7n-value-wrapper" style={{ width: 'auto' }}>
           <TextEditToggle
             disabled={disabled}
-            formKey={fieldCode}
             onSubmit={this.updateIssueField}
-            originData={this.transform(fieldType, value == null ? defaultValue : value)}
+            formKey={fieldCode}
+            originData={this.transform(fieldType, value)}
             required={required}
             fieldType={fieldType}
             fieldName={fieldName}
+            fieldProps={{ getValueFromEvent: fieldType === 'number' ? v => (v ? String(v) : undefined) : undefined }}
           >
             <Text key="text">
               <div style={{ maxWidth: 200, wordBreak: 'break-all', whiteSpace: 'pre-line' }}>
-                {fieldType === 'member' && (valueStr || (required && defaultValue))
+                {fieldType === 'member' && valueStr
                   ? (
                     <UserHead
-                      user={valueStr || defaultValueObj}
+                      user={valueStr}
                     />
-                  ) : ((this.getDefaultStr(field)) || '无')}
+                  ) : (valueStr || '无')}
               </div>
             </Text>
             <Edit key="edit">
@@ -386,4 +346,4 @@ let sign = false;
   }
 }
 
-export default withRouter(injectIntl(IssueField));
+export default Field;

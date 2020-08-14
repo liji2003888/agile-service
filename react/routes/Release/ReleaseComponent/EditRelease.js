@@ -1,10 +1,11 @@
 import React, { Component } from 'react';
 import { observer, inject } from 'mobx-react';
 import {
-  Modal, Form, Input, DatePicker,
+  Modal, Form, Input, DatePicker, Button,
 } from 'choerodon-ui';
 import moment from 'moment';
-import { Content, stores } from '@choerodon/boot';
+import { stores } from '@choerodon/boot';
+import { versionApi, permissionApi } from '@/api';
 import ReleaseStore from '../../../stores/project/release/ReleaseStore';
 
 const { Sidebar } = Modal;
@@ -20,6 +21,7 @@ class EditRelease extends Component {
       startDate: null,
       expectReleaseDate: null,
       loading: false,
+      editPermission: true,
     };
   }
 
@@ -27,6 +29,14 @@ class EditRelease extends Component {
     this.setState({
       startDate: ReleaseStore.getVersionDetail.startDate ? moment(ReleaseStore.getVersionDetail.startDate, 'YYYY-MM-DD HH:mm:ss') : null,
       expectReleaseDate: ReleaseStore.getVersionDetail.expectReleaseDate ? moment(ReleaseStore.getVersionDetail.expectReleaseDate, 'YYYY-MM-DD HH:mm:ss') : null,
+    });
+  }
+
+  componentDidMount() {
+    permissionApi.check(['choerodon.code.project.cooperation.work-list.ps.choerodon.code.cooperate.worklist.updateversion']).then((res) => {
+      this.setState({
+        editPermission: res.find(item => item.code === 'choerodon.code.project.cooperation.work-list.ps.choerodon.code.cooperate.worklist.updateversion').approve,
+      });
     });
   }
 
@@ -47,9 +57,9 @@ class EditRelease extends Component {
           projectId: AppState.currentMenuType.id,
           startDate: value.startDate ? `${moment(value.startDate).format('YYYY-MM-DD')} 00:00:00` : null,
           expectReleaseDate: value.expectReleaseDate ? `${moment(value.expectReleaseDate).format('YYYY-MM-DD')} 00:00:00` : null,
-          versionId: ReleaseStore.getVersionDetail.versionId,
+          // versionId: ReleaseStore.getVersionDetail.versionId,
         };
-        ReleaseStore.axiosUpdateVersion(
+        versionApi.update(
           ReleaseStore.getVersionDetail.versionId, newData,
         ).then((res) => {
           this.setState({
@@ -72,7 +82,7 @@ class EditRelease extends Component {
     const proId = AppState.currentMenuType.id;
     const data = JSON.parse(JSON.stringify(ReleaseStore.getVersionDetail));
     if (value && value.trim() && data.name !== value.trim()) {
-      ReleaseStore.axiosCheckName(proId, value.trim()).then((res) => {
+      versionApi.checkName(value.trim()).then((res) => {
         if (res) {
           callback('版本名称重复');
         } else {
@@ -86,7 +96,9 @@ class EditRelease extends Component {
   };
 
   render() {
-    const { loading, expectReleaseDate, startDate } = this.state;
+    const {
+      loading, expectReleaseDate, startDate, editPermission, 
+    } = this.state;
     const { form, visible, onCancel } = this.props;
     const { getFieldDecorator } = form;
     const data = JSON.parse(JSON.stringify(ReleaseStore.getVersionDetail));
@@ -95,13 +107,15 @@ class EditRelease extends Component {
       <Sidebar
         title="修改发布计划"
         visible={visible}
-        onCancel={onCancel.bind(this)}
         destroyOnClose
-        okText="确定"
-        cancelText="取消"
-        onOk={this.handleOk.bind(this)}
         confirmLoading={loading}
         width={380}
+        footer={[
+          <Button key="submit" type="primary" funcType="raised" loading={loading} onClick={this.handleOk} disabled={!editPermission}>
+            确定
+          </Button>,
+          <Button key="back" onClick={onCancel}>取消</Button>,
+        ]}
       >
         {
           visible ? (
@@ -127,6 +141,7 @@ class EditRelease extends Component {
                   <DatePicker
                     style={{ width: '100%' }}
                     label="开始日期"
+                    placeholder="请选择开始日期"
                     disabledDate={expectReleaseDate
                       ? current => current > moment(expectReleaseDate) : () => false}
                     onChange={(date) => {
@@ -143,7 +158,8 @@ class EditRelease extends Component {
                 })(
                   <DatePicker
                     style={{ width: '100%' }}
-                    label="预计发布时间"
+                    label="预计发布日期"
+                    placeholder="请选择预计发布日期"
                     disabledDate={startDate
                       ? current => current < moment(startDate) : () => false}
                     onChange={(date) => {

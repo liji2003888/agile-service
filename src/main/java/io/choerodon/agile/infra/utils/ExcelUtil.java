@@ -1,8 +1,11 @@
 package io.choerodon.agile.infra.utils;
 
+import io.choerodon.agile.infra.dto.PredefinedDTO;
+import io.choerodon.agile.infra.enums.ExcelImportTemplateColumn;
 import io.choerodon.core.exception.CommonException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.hssf.util.HSSFColor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellRangeAddressList;
@@ -13,6 +16,8 @@ import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.apache.poi.xssf.usermodel.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.ObjectUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
@@ -21,15 +26,15 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @author dinghuang123@gmail.com
  * @since 2018/8/17
  */
 public class ExcelUtil {
+
+    private static final Integer CELL_MAX_LENGTH = 32767;
 
     public enum Mode {
         SXSSF("SXSSF"), HSSF("HSSF"), XSSF("XSSF");
@@ -44,7 +49,42 @@ public class ExcelUtil {
         }
     }
 
-    private ExcelUtil() {
+    public static class GuideSheet {
+
+        private int rowNum;
+
+        private String fieldName;
+
+        private String requestStr;
+
+        private Boolean hasStyle;
+
+        public GuideSheet(int rowNum, String fieldName, String requestStr, Boolean hasStyle) {
+            this.rowNum = rowNum;
+            this.fieldName = fieldName;
+            this.requestStr = requestStr;
+            this.hasStyle = hasStyle;
+        }
+
+        public int rowNum() {
+            return this.rowNum;
+        }
+
+        public String fieldName() {
+            return this.fieldName;
+        }
+
+        public String requestStr() {
+            return this.requestStr;
+        }
+
+        public Boolean hasStyle() {
+            return this.hasStyle;
+        }
+
+    }
+
+    protected ExcelUtil() {
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ExcelUtil.class);
@@ -59,76 +99,278 @@ public class ExcelUtil {
         Row row = sheet.createRow(rowNum);
         row.createCell(0).setCellValue(fieldName);
         Cell cell = row.createCell(1);
-        cell.setCellValue(requestStr);
+        cell.setCellValue(substring(requestStr));
         if (hasStyle) {
             cell.setCellStyle(ztStyle);
         }
     }
 
-    private static void initGuideSheetRemind(Workbook workbook, Sheet sheet, String remindInfo) {
+    protected static void initGuideSheetRemind(Workbook workbook, Sheet sheet, String remindInfo,
+                                             int startRow, int lastRow, int firstCol, int lastCol) {
         CellStyle ztStyle = workbook.createCellStyle();
         Font ztFont = workbook.createFont();
         ztFont.setColor(Font.COLOR_RED);
         ztStyle.setFont(ztFont);
         ztStyle.setAlignment(CellStyle.ALIGN_CENTER);
         ztStyle.setVerticalAlignment(CellStyle.VERTICAL_CENTER);
-        sheet.addMergedRegion(new CellRangeAddress(0, 9, 2, 4));
+        sheet.addMergedRegion(new CellRangeAddress(startRow, lastRow, firstCol, lastCol));
         Row row = sheet.getRow(0);
         Cell cell = row.createCell(2);
-        cell.setCellValue(remindInfo);
+        cell.setCellValue(substring(remindInfo));
         cell.setCellStyle(ztStyle);
     }
 
-    public static void createGuideSheet(Workbook wb) {
-        Sheet sheet = wb.createSheet("要求");
-        sheet.setColumnWidth(0, 5000);
-        sheet.setColumnWidth(1, 15000);
-        initGuideSheetByRow(wb, sheet, 0, "概要", "必输项，限制44个字符", true);
-        initGuideSheetByRow(wb, sheet, 1, "描述", "非必输", false);
-        initGuideSheetByRow(wb, sheet, 2, "优先级", "必输项", true);
-        initGuideSheetByRow(wb, sheet, 3, "问题类型", "必输项", true);
-        initGuideSheetByRow(wb, sheet, 4, "故事点", "非必输，仅支持3位整数或者0.5", false);
-        initGuideSheetByRow(wb, sheet, 5, "剩余时间", "非必输，仅支持3位整数或者0.5", false);
-        initGuideSheetByRow(wb, sheet, 6, "修复版本", "非必输", false);
-        initGuideSheetByRow(wb, sheet, 7, "史诗名称", "如果问题类型选择史诗，此项必填, 限制10个字符", true);
-        initGuideSheetByRow(wb, sheet, 8, "模块", "非必输", false);
-        initGuideSheetByRow(wb, sheet, 9, "冲刺", "非必输", false);
-        sheet.setColumnWidth(2, 3000);
-        initGuideSheetRemind(wb, sheet, "请至下一页，填写信息");
+    public static List<GuideSheet> initGuideSheet() {
+        int i = 0;
+        GuideSheet[] guideSheets = {
+                new GuideSheet(i++, "问题类型", "必选项", true),
+                new GuideSheet(i++, "所属史诗", "非必选项，普通应用项目未加入项目群ART且问题类型为故事可选，否则不可选", true),
+                new GuideSheet(i++, "模块", "非必输项", false),
+                new GuideSheet(i++, "冲刺", "非必输项，任务/故事下的子任务冲刺默认和父级一致", false),
+                new GuideSheet(i++, "概要", "必输项，限制44个字符以内", true),
+                new GuideSheet(i++, "子任务概述", "非必输项，故事、任务类型下可创建子任务", false),
+                new GuideSheet(i++, "描述", "非必输，仅支持填写纯文本", false),
+                new GuideSheet(i++, "经办人", "非必选项", false),
+                new GuideSheet(i++, "报告人", "非必选项", false),
+                new GuideSheet(i++, "优先级", "必选项", true),
+                new GuideSheet(i++, "预估时间", "非必输项，仅支持3位整数或者0.5，预估时间以小时为单位", false),
+                new GuideSheet(i++, "版本", "非必选项", false),
+                new GuideSheet(i++, "故事点", "非必输，仅支持3位整数或者0.5，仅故事类型须填写，否则不生效", false),
+                new GuideSheet(i++, "史诗名称", "如果问题类型选择史诗，此项必填, 限制10个字符", true),
+        };
+        return Arrays.asList(guideSheets);
     }
 
-    public static Workbook generateExcelAwesome(Workbook generateExcel, List<Integer> errorRows, Map<Integer, List<Integer>> errorMapList, String[] FIELDS_NAME, List<String> priorityList, List<String> issueTypeList, List<String> versionList, String sheetName, List<String> componentList, List<String> sprintList) {
+    public static void createGuideSheet(Workbook wb, List<GuideSheet> guideSheets, boolean withFeature) {
+        Sheet sheet = initGuide(wb, guideSheets, withFeature);
+        initGuideSheetRemind(wb, sheet, "请至下一页，填写信息",0, 9, 2, 4);
+        initExample(wb, sheet, withFeature);
+    }
+
+    protected static Sheet initGuide(Workbook wb, List<GuideSheet> guideSheets, boolean withFeature) {
+        if (withFeature) {
+            GuideSheet guideSheet = new GuideSheet(1, "所属特性", "非必须项，普通应用项目加入项目群后且问题类型为故事可选，否则不可选", true);
+            guideSheets.set(1, guideSheet);
+            guideSheets = guideSheets.subList(0, guideSheets.size() - 1);
+        }
+        Sheet sheet = wb.createSheet("要求");
+        sheet.setColumnWidth(0, 5000);
+        sheet.setColumnWidth(1, 17000);
+
+        for (GuideSheet guideSheet : guideSheets) {
+            initGuideSheetByRow(wb, sheet, guideSheet.rowNum(),
+                    guideSheet.fieldName(), guideSheet.requestStr(), guideSheet.hasStyle());
+        }
+
+        sheet.setColumnWidth(2, 3000);
+        return sheet;
+    }
+
+    private static void initExample(Workbook wb, Sheet sheet, boolean withFeature) {
+        sheet.setColumnWidth(ExcelImportTemplateColumn.Issue.SUMMARY_COL, 8000);
+        sheet.setColumnWidth(ExcelImportTemplateColumn.Issue.SUB_TASK_COL, 6000);
+        sheet.setColumnWidth(ExcelImportTemplateColumn.Issue.DESCRIPTION_COL, 8500);
+        sheet.setColumnWidth(ExcelImportTemplateColumn.Issue.PRIORITY_COL, 6000);
+        sheet.setColumnWidth(ExcelImportTemplateColumn.Issue.EPIC_NAME_COL, 9000);
+
+        Row row = sheet.createRow(18);
+        row.createCell(0).setCellValue("示例：");
+
+        CellStyle blueBackground = wb.createCellStyle();
+        blueBackground.setFillForegroundColor(IndexedColors.LIGHT_BLUE.getIndex());
+        blueBackground.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+        CellStyle coralBackground = wb.createCellStyle();
+        coralBackground.setFillForegroundColor(IndexedColors.CORAL.getIndex());
+        coralBackground.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+        String[] data1 = {"问题类型*", "所属史诗", "模块", "冲刺", "概述*",
+                "子任务概述(仅子任务生效)", "描述", "经办人","报告人", "优先级*", "预估时间(小时)",
+                "版本", "故事点", "史诗名称(仅问题类型为史诗时生效)"};
+        String secondColumnValue = "可以选择史诗";
+        if (withFeature) {
+            data1[1] = "所属特性";
+            secondColumnValue = "可以选择特性";
+        }
+        int startRow = 20;
+        createRow(sheet, startRow++, subArray(data1, withFeature), blueBackground);
+
+        String[] data2 = {"史诗", "", "敏捷管理", "", "请输入史诗的概述",
+                "", "请输入导入史诗类型的问题的描述信息", "", "", "高", "", "", "", "导入问题"};
+        if (withFeature) {
+            data2[0] = "特性";
+            data2[4] = "请输入特性的概述";
+        }
+        createRow(sheet, startRow++, subArray(data2, withFeature), null);
+
+        String[] data3 = {"故事", secondColumnValue, "敏捷管理", "sprint-1", "这里输入故事的概述：故事1",
+                "", "导入故事并且导入故事下的子任务", "张三", "张三", "中", "8", "0.1", "2", ""};
+        createRow(sheet, startRow++, subArray(data3, withFeature), coralBackground);
+
+        String[] data4 = {"", "", "", "", "", "故事1的子任务1的概述", "请输入子任务1的描述信息", "李四", "李四", "高", "2", "", "", ""};
+        createRow(sheet, startRow++, subArray(data4, withFeature), coralBackground);
+
+        String[] data5 = {"", "", "", "", "", "故事1的子任务2的概述", "请输入子任务2的描述信息", "王五", "王五", "中", "4", "", "", ""};
+        createRow(sheet, startRow++, subArray(data5, withFeature), coralBackground);
+
+        String[] data6 = {"", "", "", "", "", "故事1的子任务3的概述……", "请输入子任务3的描述信息", "陈七", "陈七", "低", "2", "", "", ""};
+        createRow(sheet, startRow++, subArray(data6, withFeature), coralBackground);
+
+        String[] data7 = {"任务", secondColumnValue, "敏捷管理", "sprint-1", "请在此处输入任务的概述：任务1", "", "请输入任务2的描述信息", "王五", "王五", "中", "5", "0.2", "", ""};
+        createRow(sheet, startRow++, subArray(data7, withFeature), null);
+
+        String[] data8 = {"", "", "", "", "", "任务1的子任务4的概述", "请输入子任务4的描述信息", "小六", "小六", "中", "2", "0.2", "", ""};
+        createRow(sheet, startRow++, subArray(data8, withFeature), null);
+
+        String[] data9 = {"", "", "", "", "", "任务1的子任务5的概述", "请输入子任务5的描述信息", "初八", "初八", "中", "2", "0.2", "", ""};
+        createRow(sheet, startRow++, subArray(data9, withFeature), null);
+
+
+        String[] data10 = {"故事", secondColumnValue, "敏捷管理", "sprint-1", "这里输入故事的概述：故事2", "", "仅导入故事", "张三", "张三", "中", "8", "0.1", "2", ""};
+        createRow(sheet, startRow++, subArray(data10, withFeature), coralBackground);
+
+        String[] data11 = {"任务", secondColumnValue, "敏捷管理", "sprint-1", "请在此处输入任务的概述：任务2", "", "请输入任务2的描述信息", "张三", "张三", "中", "8", "0.1", "", ""};
+        createRow(sheet, startRow++, subArray(data11, withFeature), null);
+
+        String[] data12 = {"缺陷", secondColumnValue, "敏捷管理", "sprint-1", "请在此处输入缺陷的概述：缺陷1", "", "请输入缺陷2的描述信息", "李四", "李四", "低", "0.5", "0.1", "", ""};
+        createRow(sheet, startRow++, subArray(data12, withFeature), coralBackground);
+    }
+
+    private static String[] subArray(String[] data, boolean withFeature) {
+        if (withFeature) {
+            int len = data.length;
+            String[] newArray = new String[len - 1];
+            for (int i = 0; i < len - 1; i++) {
+                newArray[i] = data[i];
+            }
+            return newArray;
+        } else {
+            return data;
+        }
+    }
+
+    public static void createRow(Sheet sheet, int rowNum, String[] data, CellStyle background) {
+        Row row = sheet.createRow(rowNum);
+        for (int i = 0; i < data.length; i++) {
+            Cell cell = row.createCell(i);
+            cell.setCellValue(substring(data[i]));
+            if (background != null) {
+                cell.setCellStyle(background);
+            }
+        }
+    }
+
+    public static Workbook generateExcelAwesome(Workbook generateExcel,
+                                                List<Integer> errorRows,
+                                                Map<Integer, List<Integer>> errorMapList,
+                                                String[] fieldsName,
+                                                List<String> priorityList,
+                                                List<String> issueTypeList,
+                                                List<String> versionList,
+                                                String sheetName,
+                                                List<String> componentList,
+                                                List<String> sprintList,
+                                                List<String> users,
+                                                PredefinedDTO theSecondColumnPredefined,
+                                                boolean withFeature) {
         XSSFWorkbook workbook = new XSSFWorkbook();
         // create guide sheet
-        createGuideSheet(workbook);
+        createGuideSheet(workbook, initGuideSheet(), withFeature);
         Sheet resultSheet = workbook.createSheet(sheetName);
-        for (int i = 0; i < 10; i++) {
-            resultSheet.setColumnWidth(i, 3500);
-        }
-        Row titleRow = resultSheet.createRow(0);
         CellStyle style = CatalogExcelUtil.getHeadStyle(workbook);
-        CatalogExcelUtil.initCell(titleRow.createCell(0), style, FIELDS_NAME[0]);
-        CatalogExcelUtil.initCell(titleRow.createCell(1), style, FIELDS_NAME[1]);
-        CatalogExcelUtil.initCell(titleRow.createCell(2), style, FIELDS_NAME[2]);
-        CatalogExcelUtil.initCell(titleRow.createCell(3), style, FIELDS_NAME[3]);
-        CatalogExcelUtil.initCell(titleRow.createCell(4), style, FIELDS_NAME[4]);
-        CatalogExcelUtil.initCell(titleRow.createCell(5), style, FIELDS_NAME[5]);
-        CatalogExcelUtil.initCell(titleRow.createCell(6), style, FIELDS_NAME[6]);
-        CatalogExcelUtil.initCell(titleRow.createCell(7), style, FIELDS_NAME[7]);
-        CatalogExcelUtil.initCell(titleRow.createCell(8), style, FIELDS_NAME[8]);
-        CatalogExcelUtil.initCell(titleRow.createCell(9), style, FIELDS_NAME[9]);
+        Map<Integer,Integer> widthMap = new HashMap<>();
+        widthMap.put(ExcelImportTemplateColumn.Issue.EPIC_COL, 8000);
+        widthMap.put(ExcelImportTemplateColumn.Issue.SUB_TASK_COL, 8000);
+        widthMap.put(ExcelImportTemplateColumn.Issue.EPIC_NAME_COL, 8000);
+        generateHeaders(resultSheet, style, Arrays.asList(fieldsName), widthMap);
 
-        workbook = dropDownList2007(workbook, resultSheet, priorityList, 1, 500, 2, 2, "hidden_priority", 2);
-        workbook = dropDownList2007(workbook, resultSheet, issueTypeList, 1, 500, 3, 3, "hidden_issue_type", 3);
-//        if (!versionList.isEmpty()) {
-        workbook = dropDownList2007(workbook, resultSheet, versionList, 1, 500, 6, 6, "hidden_fix_version", 4);
-//        }
-//        if (!componentList.isEmpty()) {
-        workbook = dropDownList2007(workbook, resultSheet, componentList, 1, 500, 8, 8, "hidden_component", 5);
-//        }
-//        if (!sprintList.isEmpty()) {
-        workbook = dropDownList2007(workbook, resultSheet, sprintList, 1, 500, 9, 9, "hidden_sprint", 6);
-//        }
+        List<PredefinedDTO> predefinedList = new ArrayList<>();
+        predefinedList.add(
+                new PredefinedDTO(
+                        priorityList,
+                        1,
+                        500,
+                        ExcelImportTemplateColumn.Issue.PRIORITY_SHEET.getCol(),
+                        ExcelImportTemplateColumn.Issue.PRIORITY_SHEET.getCol(),
+                        ExcelImportTemplateColumn.Issue.PRIORITY_SHEET.getName(),
+                        ExcelImportTemplateColumn.Issue.PRIORITY_SHEET.getIndex()
+                ));
+        predefinedList.add(
+                new PredefinedDTO(
+                        issueTypeList,
+                        1,
+                        500,
+                        ExcelImportTemplateColumn.Issue.ISSUE_TYPE_SHEET.getCol(),
+                        ExcelImportTemplateColumn.Issue.ISSUE_TYPE_SHEET.getCol(),
+                        ExcelImportTemplateColumn.Issue.ISSUE_TYPE_SHEET.getName(),
+                        ExcelImportTemplateColumn.Issue.ISSUE_TYPE_SHEET.getIndex()
+                ));
+        predefinedList.add(
+                new PredefinedDTO(
+                        versionList,
+                        1,
+                        500,
+                        ExcelImportTemplateColumn.Issue.FIX_VERSION_SHEET.getCol(),
+                        ExcelImportTemplateColumn.Issue.FIX_VERSION_SHEET.getCol(),
+                        ExcelImportTemplateColumn.Issue.FIX_VERSION_SHEET.getName(),
+                        ExcelImportTemplateColumn.Issue.FIX_VERSION_SHEET.getIndex()
+                ));
+        predefinedList.add(
+                new PredefinedDTO(
+                        componentList,
+                        1,
+                        500,
+                        ExcelImportTemplateColumn.Issue.COMPONENT_SHEET.getCol(),
+                        ExcelImportTemplateColumn.Issue.COMPONENT_SHEET.getCol(),
+                        ExcelImportTemplateColumn.Issue.COMPONENT_SHEET.getName(),
+                        ExcelImportTemplateColumn.Issue.COMPONENT_SHEET.getIndex()
+                ));
+        predefinedList.add(
+                new PredefinedDTO(
+                        sprintList,
+                        1,
+                        500,
+                        ExcelImportTemplateColumn.Issue.SPRINT_SHEET.getCol(),
+                        ExcelImportTemplateColumn.Issue.SPRINT_SHEET.getCol(),
+                        ExcelImportTemplateColumn.Issue.SPRINT_SHEET.getName(),
+                        ExcelImportTemplateColumn.Issue.SPRINT_SHEET.getIndex()
+                ));
+        predefinedList.add(
+                new PredefinedDTO(
+                        users,
+                        1,
+                        500,
+                        ExcelImportTemplateColumn.Issue.MANAGER_SHEET.getCol(),
+                        ExcelImportTemplateColumn.Issue.MANAGER_SHEET.getCol(),
+                        ExcelImportTemplateColumn.Issue.MANAGER_SHEET.getName(),
+                        ExcelImportTemplateColumn.Issue.MANAGER_SHEET.getIndex()
+                ));
+        predefinedList.add(
+                new PredefinedDTO(
+                        users,
+                        1,
+                        500,
+                        ExcelImportTemplateColumn.Issue.REPORTER_SHEET.getCol(),
+                        ExcelImportTemplateColumn.Issue.REPORTER_SHEET.getCol(),
+                        ExcelImportTemplateColumn.Issue.REPORTER_SHEET.getName(),
+                        ExcelImportTemplateColumn.Issue.REPORTER_SHEET.getIndex()
+                ));
+        predefinedList.add(theSecondColumnPredefined);
+
+        for (PredefinedDTO predefined : predefinedList) {
+            workbook =
+                    dropDownList2007(
+                            workbook,
+                            resultSheet,
+                            predefined.values(),
+                            predefined.startRow(),
+                            predefined.endRow(),
+                            predefined.startCol(),
+                            predefined.endCol(),
+                            predefined.hidden(),
+                            predefined.hiddenSheetIndex());
+        }
+
         Sheet sheet = generateExcel.getSheetAt(1);
         int size = sheet.getPhysicalNumberOfRows();
         XSSFCellStyle ztStyle = workbook.createCellStyle();
@@ -140,10 +382,10 @@ public class ExcelUtil {
             if (errorRows.contains(i)) {
                 Row row = sheet.getRow(i);
                 Row newRow = resultSheet.createRow(index++);
-                for (int j = 0; j < FIELDS_NAME.length; j++) {
+                for (int j = 0; j < fieldsName.length; j++) {
                     Cell cell = newRow.createCell(j);
                     if (row.getCell(j) != null) {
-                        cell.setCellValue(row.getCell(j).toString());
+                        cell.setCellValue(substring(row.getCell(j).toString()));
                     }
                     if (errorMapList.get(i) != null) {
                         List<Integer> errList = errorMapList.get(i);
@@ -156,6 +398,25 @@ public class ExcelUtil {
         }
         return workbook;
     }
+
+    public static void generateHeaders(Sheet sheet, CellStyle style, List<String> headers,
+                                       Map<Integer, Integer> widthMap) {
+        Row row = sheet.createRow(0);
+        int columnNum = headers.size();
+        int defaultWidth = 4000;
+        for (int i = 0; i < columnNum; i++) {
+            if (!ObjectUtils.isEmpty(widthMap)
+                    && !ObjectUtils.isEmpty(widthMap.get(i))) {
+                sheet.setColumnWidth(i, widthMap.get(i));
+            } else {
+                sheet.setColumnWidth(i, defaultWidth);
+            }
+        }
+        for (int i = 0; i < headers.size(); i++) {
+            CatalogExcelUtil.initCell(row.createCell(i), style, headers.get(i));
+        }
+    }
+
 
     public static <T> SXSSFWorkbook generateExcel(List<T> list, Class<T> clazz, String[] fieldsName, String[] fields, String sheetName) {
         //1、创建工作簿
@@ -175,6 +436,7 @@ public class ExcelUtil {
             for (int j = 0; j < list.size(); j++) {
                 SXSSFRow row = sheet.createRow(j + 1);
                 row.setHeight((short) 260);
+                Object data = list.get(j);
                 for (int i = 0; i < fieldsName.length; i++) {
                     //3.3设置列标题
                     SXSSFCell cell2 = row2.createCell(i);
@@ -182,7 +444,7 @@ public class ExcelUtil {
                     cell2.setCellStyle(style2);
                     cell2.setCellValue(fieldsName[i]);
                     //4、操作单元格；将数据写入excel
-                    handleWriteCell(row, i, j, list, cellStyle, fields, clazz);
+                    handleWriteCell(row, i, data, cellStyle, fields, clazz, null);
                 }
             }
         }
@@ -192,8 +454,13 @@ public class ExcelUtil {
     /**
      * 通过类导出
      */
-    public static <T> void export(List<T> list, Class<T> clazz, String[] fieldsName, String[] fields, String sheetName, List<String> autoSizeColumn, HttpServletResponse response) {
-        if (list != null && !list.isEmpty()) {
+    public static <T> void export(Map<Long, T> map,
+                                  Map<Long,Set<Long>> parentSonMap,
+                                  Class<T> clazz, String[] fieldsName,
+                                  String[] fields, String sheetName,
+                                  List<String> autoSizeColumn,
+                                  HttpServletResponse response) {
+        if (!ObjectUtils.isEmpty(map)) {
             //1、创建工作簿
             SXSSFWorkbook workbook = new SXSSFWorkbook();
             //1.3、列标题样式
@@ -205,6 +472,7 @@ public class ExcelUtil {
             SXSSFSheet sheet = workbook.createSheet(sheetName);
             //设置默认列宽
             sheet.setDefaultColumnWidth(13);
+            sheet.setColumnWidth(3, 12000);
             //创建标题列
             SXSSFRow row2 = sheet.createRow(0);
             row2.setHeight((short) 260);
@@ -212,16 +480,48 @@ public class ExcelUtil {
                 //3.3设置列标题
                 SXSSFCell cell2 = row2.createCell(i);
                 //加载单元格样式
+                style2.setFillForegroundColor(HSSFColor.PALE_BLUE.index);
+                style2.setFillPattern(FillPatternType.SOLID_FOREGROUND);
                 cell2.setCellStyle(style2);
                 cell2.setCellValue(fieldsName[i]);
             }
-            for (int j = 0; j < list.size(); j++) {
-                SXSSFRow row = sheet.createRow(j + 1);
-                row.setHeight((short) 260);
-                for (int i = 0; i < fieldsName.length; i++) {
-                    ;
-                    //4、操作单元格；将数据写入excel
-                    handleWriteCell(row, i, j, list, cellStyle, fields, clazz);
+
+            Set<Long> childrenSet = new HashSet<>();
+            for (Map.Entry<Long, Set<Long>> entry : parentSonMap.entrySet()) {
+                childrenSet.addAll(entry.getValue());
+            }
+            int rowNum = 1;
+            IndexedColors lastColors = null;
+            for (Map.Entry<Long, T> entry : map.entrySet()) {
+                Long id = entry.getKey();
+                T data = entry.getValue();
+                if (childrenSet.contains(id)) {
+                    continue;
+                }
+                Set<Long> sonSet = parentSonMap.get(id);
+                boolean hasSonNodes = !ObjectUtils.isEmpty(sonSet);
+                CellStyle foregroundColor = null;
+                if (hasSonNodes) {
+                    if (ObjectUtils.isEmpty(lastColors)) {
+                        lastColors = IndexedColors.TAN;
+                    } else if (IndexedColors.TAN.equals(lastColors)) {
+                        lastColors = IndexedColors.LIGHT_TURQUOISE;
+                    } else if (IndexedColors.LIGHT_TURQUOISE.equals(lastColors)) {
+                        lastColors = IndexedColors.TAN;
+                    }
+                    foregroundColor = createForegroundColor(workbook, lastColors);
+                }
+                fillInExcelRow(clazz, fieldsName, fields, cellStyle, sheet, rowNum, data, foregroundColor);
+                rowNum++;
+
+                if (hasSonNodes) {
+                    for (Long sonId : sonSet) {
+                        T son = map.get(sonId);
+                        if (!ObjectUtils.isEmpty(son)) {
+                            fillInExcelRow(clazz, fieldsName, fields, cellStyle, sheet, rowNum, son, foregroundColor);
+                            rowNum++;
+                        }
+                    }
                 }
             }
             sheet.trackAllColumnsForAutoSizing();
@@ -250,15 +550,47 @@ public class ExcelUtil {
         }
     }
 
-    private static <T> void handleWriteCell(SXSSFRow row, int i, int j, List<T> list, CellStyle cellStyle, String[] fields, Class<T> clazz) {
+    protected static CellStyle createForegroundColor(SXSSFWorkbook workbook, IndexedColors colors) {
+        CellStyle cellStyle = workbook.createCellStyle();
+        cellStyle.setFillForegroundColor(colors.getIndex());
+        cellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        return cellStyle;
+    }
+
+    protected static <T> void fillInExcelRow(Class<T> clazz,
+                                           String[] fieldsName,
+                                           String[] fields,
+                                           CellStyle cellStyle,
+                                           SXSSFSheet sheet,
+                                           int rowNum,
+                                           T data,
+                                           CellStyle foregroundColor) {
+        SXSSFRow row = sheet.createRow(rowNum);
+        row.setHeight((short) 260);
+        for (int i = 0; i < fieldsName.length; i++) {
+            //4、操作单元格；将数据写入excel
+            handleWriteCell(row, i, data, cellStyle, fields, clazz, foregroundColor);
+        }
+    }
+
+    protected static <T> void handleWriteCell(SXSSFRow row,
+                                              int i,
+                                              Object data,
+                                              CellStyle cellStyle,
+                                              String[] fields,
+                                              Class<T> clazz,
+                                              CellStyle foregroundColor) {
         SXSSFCell cell = row.createCell(i);
         cell.setCellStyle(cellStyle);
-        if (list.get(j) != null) {
+        if (!ObjectUtils.isEmpty(foregroundColor)) {
+            cell.setCellStyle(foregroundColor);
+        }
+        if (data != null) {
             Method method = null;
             try {
                 method = clazz.getMethod(createGetter(fields[i]));
             } catch (NoSuchMethodException e) {
-                LOGGER.debug(e.getMessage());
+                LOGGER.debug("no such method exception: {}", e);
                 try {
                     method = clazz.getMethod("getFoundationFieldValue");
                 } catch (NoSuchMethodException e1) {
@@ -267,27 +599,35 @@ public class ExcelUtil {
             }
             Object invoke = new Object();
             try {
-                invoke = method.invoke(list.get(j));
+                invoke = method.invoke(data);
             } catch (InvocationTargetException | IllegalAccessException e) {
                 LOGGER.error(EXCEPTION, e);
             }
             if (invoke instanceof Date) {
                 SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                cell.setCellValue(formatter.format(invoke));
+                cell.setCellValue(substring(formatter.format(invoke)));
             } else if (invoke instanceof Map) {
                 ObjectMapper m = new ObjectMapper();
                 Map<String, String> foundationFieldValue = m.convertValue(invoke, Map.class);
 
                 String str = foundationFieldValue.get(fields[i]) != null ? foundationFieldValue.get(fields[i]) : "";
-                cell.setCellValue(str);
+                cell.setCellValue(substring(str));
             } else {
                 String str = invoke == null ? null : invoke.toString();
-                cell.setCellValue(str);
+                cell.setCellValue(substring(str));
             }
         } else {
             cell.setCellValue("");
         }
 
+    }
+
+    protected static String substring(String str) {
+        if (StringUtils.hasText(str) && str.length() > CELL_MAX_LENGTH) {
+            return str.substring(0, CELL_MAX_LENGTH);
+        } else {
+            return str;
+        }
     }
 
 
@@ -298,7 +638,7 @@ public class ExcelUtil {
      * @param fontSize 字体大小
      * @return 单元格样式
      */
-    private static CellStyle createCellStyle(SXSSFWorkbook workbook, short fontSize, short aligment, Boolean bold) {
+    protected static CellStyle createCellStyle(SXSSFWorkbook workbook, short fontSize, short aligment, Boolean bold) {
         CellStyle cellStyle = workbook.createCellStyle();
         cellStyle.setAlignment(aligment);
         //垂直居中
@@ -319,7 +659,7 @@ public class ExcelUtil {
      * @param fieldName fieldName
      * @return String
      */
-    private static String createGetter(String fieldName) {
+    protected static String createGetter(String fieldName) {
         if (fieldName == null || fieldName.length() == 0) {
             return null;
         }
@@ -337,7 +677,7 @@ public class ExcelUtil {
                     return null;
             }
         } catch (IOException e) {
-            throw new CommonException(e.getMessage());
+            throw new CommonException("error.multipartFile.to.workbook", e);
         }
     }
 
@@ -381,7 +721,7 @@ public class ExcelUtil {
         for (int i = 0; i < datas.size(); i++) {
             row = hidden.createRow(i);
             cell = row.createCell(0);
-            cell.setCellValue(datas.get(i));
+            cell.setCellValue(substring(datas.get(i)));
         }
         XSSFDataValidationHelper dvHelper = new XSSFDataValidationHelper((XSSFSheet) realSheet);
         XSSFDataValidationConstraint dvConstraint = (XSSFDataValidationConstraint) dvHelper.createFormulaListConstraint(hiddenSheetName + "!$A$1:$A" + datas.size());

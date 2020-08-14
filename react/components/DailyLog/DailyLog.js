@@ -4,8 +4,8 @@ import moment from 'moment';
 import {
   Select, DatePicker, Modal, Radio,
 } from 'choerodon-ui';
-import { beforeTextUpload } from '../../common/utils';
-import { createWorklog } from '../../api/NewIssueApi';
+import { beforeTextUpload } from '@/utils/richText';
+import { workLogApi } from '@/api';
 import WYSIWYGEditor from '../WYSIWYGEditor';
 import './DailyLog.less';
 
@@ -97,7 +97,7 @@ class DailyLog extends Component {
 
   handleSave = (data) => {
     const { onOk } = this.props;
-    createWorklog(data)
+    workLogApi.create(data)
       .then((res) => {
         onOk();
       });

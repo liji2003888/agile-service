@@ -3,14 +3,15 @@ import React, {
   useContext, useState, useEffect, useImperativeHandle, useRef,
 } from 'react';
 import { observer } from 'mobx-react-lite';
-import { stores, axios } from '@choerodon/boot';
+import { stores, Choerodon } from '@choerodon/boot';
 import { Spin } from 'choerodon-ui';
 import { throttle } from 'lodash';
 import './EditIssue.less';
+import useIsOwner from '@/hooks/useIsOwner';
+import { useIssueTypes } from '@/hooks';
 import {
-  loadBranchs, loadDatalogs, loadLinkIssues,
-  loadIssue, loadWorklogs, loadDocs, getFieldAndValue, loadIssueTypes,
-} from '../../api/NewIssueApi';
+  issueApi, fieldApi, issueLinkApi, workLogApi, knowledgeApi, dataLogApi, devOpsApi,
+} from '@/api';
 import RelateStory from '../RelateStory';
 import CopyIssue from '../CopyIssue';
 import ResizeAble from '../ResizeAble';
@@ -20,24 +21,23 @@ import ChangeParent from '../ChangeParent';
 import IssueHeader from './IssueComponent/IssueHeader';
 import IssueBody from './IssueComponent/IssueBody/IssueBody';
 import EditIssueContext from './stores';
-
+import IsInProgramStore from '../../stores/common/program/IsInProgramStore';
+// 项目加入群之后，不关联自己的史诗和特性，只能关联项目群的，不能改关联的史诗
 const { AppState } = stores;
 
-let loginUserId;
-let hasPermission;
 const defaultProps = {
   applyType: 'agile',
 };
 
-const EditIssue = observer(() => {
+function EditIssue() {
   const [issueLoading, setIssueLoading] = useState(false);
-  // 侧滑详情高度
   const {
-    onCurrentClicked, // 设置当前加载的问题详情信息
+    afterIssueUpdate,
     store,
     forwardedRef,
     issueId: currentIssueId,
     applyType,
+    programId,
     onUpdate,
     onIssueCopy,
     backUrl,
@@ -55,60 +55,59 @@ const EditIssue = observer(() => {
     isFullScreen,
     onChangeWidth,
   } = useContext(EditIssueContext);
+  const [isOwner] = useIsOwner();
+  const [issueTypes] = useIssueTypes();
   const container = useRef();
   const idRef = useRef();
-  const loadIssueDetail = (paramIssueId) => {
-    if (FieldVersionRef.current) {
-      FieldVersionRef.current.loadIssueVersions();
-    }
-    if (FieldFixVersionRef.current) {
-      FieldFixVersionRef.current.loadIssueVersions();
-    }
+  const loadIssueDetail = async (paramIssueId) => {
     const id = paramIssueId || currentIssueId;
     idRef.current = id;
     setIssueLoading(true);
-    loadIssue(id).then((res) => {
+    try {
+      // 1. 加载详情
+      const issue = await (programId ? issueApi.loadUnderProgram(id, programId) : issueApi.load(id));
       if (idRef.current !== id) {
         return;
       }
-      // 刷新MOBX中详情信息，防止在列表界面再次点击父问题时无法跳转
-      if (onCurrentClicked) {
-        onCurrentClicked(res);
+      // 详情中更新信息时，外部列表根据这个新的issue信息进行本地更新
+      if (afterIssueUpdate) {
+        afterIssueUpdate(issue);
       }
-
+      // 2. 根据详情加载fields
       const param = {
         schemeCode: 'agile_issue',
-        context: res.typeCode,
+        context: issue.typeCode,
         pageCode: 'agile_issue_edit',
       };
-      getFieldAndValue(id, param).then((fields) => {
-        if (idRef.current !== id) {
-          return;
-        }
-        setIssueLoading(false);
-        store.setIssueFields(res, fields);
-      });
+      const fields = await fieldApi.getFieldAndValue(id, param);
+      setIssueLoading(false);
+      store.setIssueFields(issue, fields);
       if (issueStore) {
-        issueStore.setSelectedIssue(res);
+        issueStore.setSelectedIssue(issue);
       }
-    });
-    axios.all([
-      loadDocs(id),
-      loadWorklogs(id),
-      loadDatalogs(id),
-      loadLinkIssues(id),
-      loadBranchs(id),  
-    ])
-      .then(axios.spread((doc, workLogs, dataLogs, linkIssues, branches) => {
-        if (idRef.current !== id) {
-          return;
-        }
-        store.initIssueAttribute(doc, workLogs, dataLogs, linkIssues, branches);
-      }));
+      // 3. 加载额外信息
+      const [
+        doc,
+        workLogs,
+        dataLogs,
+        linkIssues,
+        branches,
+      ] = await Promise.all([
+        knowledgeApi.loadByIssue(id),
+        programId || applyType === 'program' ? null : workLogApi.loadByIssue(id),
+        programId ? dataLogApi.loadUnderProgram(id, programId) : dataLogApi.loadByIssue(id),
+        programId || applyType === 'program' ? null : issueLinkApi.loadByIssueAndApplyType(id),
+        programId || applyType === 'program' ? null : devOpsApi.countBranches(id),
+      ]);
+      if (idRef.current !== id) {
+        return;
+      }
+      store.initIssueAttribute(doc, workLogs, dataLogs, linkIssues, branches, []);
+    } catch (error) {
+      Choerodon.prompt(error.message, 'error');
+    }
   };
-  useImperativeHandle(forwardedRef, () => ({
-    loadIssueDetail,
-  }));
+
   const setQuery = (width = container.current.clientWidth) => {
     if (width <= 600) {
       container.current.setAttribute('max-width', '600px');
@@ -116,28 +115,9 @@ const EditIssue = observer(() => {
       container.current.removeAttribute('max-width');
     }
   };
+
   useEffect(() => {
     loadIssueDetail(currentIssueId);
-    axios.all([
-      axios.get('/base/v1/users/self'),
-      axios.post('/base/v1/permissions/checkPermission', [{
-        code: 'agile-service.project-info.updateProjectInfo',
-        organizationId: AppState.currentMenuType.organizationId,
-        projectId: AppState.currentMenuType.id,
-        resourceType: 'project',
-      }, {
-        code: 'agile-service.notice.queryByProjectId',
-        organizationId: AppState.currentMenuType.organizationId,
-        projectId: AppState.currentMenuType.id,
-        resourceType: 'project',
-      }]),
-      loadIssueTypes(applyType),
-    ])
-      .then(axios.spread((users, permission, issueTypes) => {
-        loginUserId = users.id;
-        hasPermission = permission[0].approve || permission[1].approve;
-        store.setIssueTypes(issueTypes);
-      }));
     setQuery();
   }, [currentIssueId]);
 
@@ -179,6 +159,9 @@ const EditIssue = observer(() => {
     localStorage.setItem('agile.EditIssue.width', `${width}px`);
   };
 
+  useImperativeHandle(forwardedRef, () => ({
+    loadIssueDetail,
+  }));
 
   const handleResize = throttle(({ width }) => {
     setQuery(width);
@@ -186,7 +169,6 @@ const EditIssue = observer(() => {
       onChangeWidth(width);// 设置宽度
     }
   }, 150);
-
 
   const issue = store.getIssue;
   const {
@@ -203,8 +185,8 @@ const EditIssue = observer(() => {
     getTransformFromSubIssueShow: transformFromSubIssueShow,
     getRelateStoryShow: relateStoryShow,
   } = store;
-  const rightDisabled = disabled;
-  const HasPermission = (hasPermission || createdBy === AppState.userInfo.id);
+  const rightDisabled = disabled || (IsInProgramStore.isInProgram && typeCode === 'issue_epic');
+  const HasPermission = (isOwner || createdBy === AppState.userInfo.id);
   return (
     <div style={{
       position: 'fixed',
@@ -259,7 +241,7 @@ const EditIssue = observer(() => {
               reloadIssue={loadIssueDetail}
               backUrl={backUrl}
               onCancel={onCancel}
-              loginUserId={loginUserId}
+              loginUserId={AppState.userInfo.id}
               hasPermission={HasPermission}
               onDeleteIssue={onDeleteIssue}
               onUpdate={onUpdate}
@@ -271,8 +253,8 @@ const EditIssue = observer(() => {
               reloadIssue={loadIssueDetail}
               onUpdate={onUpdate}
               onDeleteSubIssue={onDeleteSubIssue}
-              loginUserId={loginUserId}
-              hasPermission={hasPermission}
+              loginUserId={AppState.userInfo.id}
+              hasPermission={isOwner}
               applyType={applyType}
               onDeleteIssue={onDeleteIssue}
               parentSummary={summary}
@@ -312,7 +294,7 @@ const EditIssue = observer(() => {
                 ovn={objectVersionNumber}
                 onCancel={() => store.setTransformSubIssueShow(false)}
                 onOk={handleTransformSubIssue.bind(this)}
-                store={store}
+                issueTypes={issueTypes}
               />
             ) : null
           }
@@ -338,6 +320,9 @@ const EditIssue = observer(() => {
                 objectVersionNumber={objectVersionNumber}
                 onOk={() => {
                   store.setChangeParentShow(false);
+                  if (onUpdate) {
+                    onUpdate();
+                  }
                   loadIssueDetail(issueId);
                 }}
                 onCancel={() => {
@@ -350,6 +335,6 @@ const EditIssue = observer(() => {
       </ResizeAble>
     </div>
   );
-});
+}
 EditIssue.defaultProps = defaultProps;
-export default EditIssue;
+export default observer(EditIssue);

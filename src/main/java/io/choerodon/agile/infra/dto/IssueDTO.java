@@ -1,7 +1,11 @@
 package io.choerodon.agile.infra.dto;
 
-import io.choerodon.mybatis.entity.BaseDTO;
+
+import io.choerodon.mybatis.annotation.ModifyAudit;
+import io.choerodon.mybatis.annotation.VersionAudit;
+import io.choerodon.mybatis.domain.AuditDomain;
 import io.choerodon.agile.infra.utils.StringUtil;
+import org.hzero.starter.keyencrypt.core.Encrypt;
 
 import javax.persistence.*;
 import javax.validation.constraints.NotNull;
@@ -16,11 +20,14 @@ import java.util.List;
  * @since 2018-05-14 20:30:48
  */
 @Table(name = "agile_issue")
-public class IssueDTO extends BaseDTO {
+@ModifyAudit
+@VersionAudit
+public class IssueDTO extends AuditDomain {
 
     /***/
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue
+    @Encrypt
     private Long issueId;
 
     /**
@@ -164,6 +171,16 @@ public class IssueDTO extends BaseDTO {
 
     @Transient
     private Long epicRankObjectVersionNumber;
+
+    @Transient
+    private String resolution;
+    public String getResolution() {
+        return resolution;
+    }
+
+    public void setResolution(String resolution) {
+        this.resolution = resolution;
+    }
 
     public List<LabelIssueRelDTO> getLabelIssueRelDTOS() {
         return labelIssueRelDTOS;

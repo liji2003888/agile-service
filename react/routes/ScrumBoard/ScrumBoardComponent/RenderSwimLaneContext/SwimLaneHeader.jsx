@@ -1,13 +1,11 @@
 import React, { Component } from 'react';
-import {
-  Icon, Button, Avatar, Collapse,
-} from 'choerodon-ui';
+import { Button } from 'choerodon-ui';
 import { observer } from 'mobx-react';
 import './SwimLaneHeader.less';
-import TypeTag from '../../../../components/TypeTag';
-import StatusTag from '../../../../components/StatusTag';
-import ScrumBoardStore from '../../../../stores/project/scrumBoard/ScrumBoardStore';
-import UserHead from '../../../../components/UserHead';
+import TypeTag from '@/components/TypeTag';
+import StatusTag from '@/components/StatusTag';
+import ScrumBoardStore from '@/stores/project/scrumBoard/ScrumBoardStore';
+import UserHead from '@/components/UserHead';
 
 @observer
 export default class SwimLaneHeader extends Component {
@@ -34,7 +32,7 @@ export default class SwimLaneHeader extends Component {
           role="none"
           onClick={(e) => {
             e.stopPropagation();
-            ScrumBoardStore.setClickedIssue(parentIssue);
+            ScrumBoardStore.setClickedIssue(parentIssue.issueId);
           }}
         >
           {switchMap.get(mode)(parentIssue)}
@@ -52,7 +50,7 @@ export default class SwimLaneHeader extends Component {
   }
 
   renderStoryComponent = ({
-    issueTypeVO, issueNum, categoryCode, statusName, summary, assigneeId,
+    issueTypeVO, issueNum, categoryCode, statusName, summary, assigneeId, ldap, email,
     assigneeName, imageUrl, assigneeLoginName, assigneeRealName,
   }) => {
     const { parentIssue } = this.props;
@@ -84,6 +82,8 @@ export default class SwimLaneHeader extends Component {
             loginName: assigneeLoginName,
             realName: assigneeRealName,
             avatar: imageUrl,
+            ldap,
+            email,
           }}
         />
         <span
@@ -103,7 +103,7 @@ export default class SwimLaneHeader extends Component {
   };
 
   renderAssigneeComponent = ({
-    assigneeName, assigneeAvatarUrl, assigneeId, assigneeLoginName, assigneeRealName,
+    assigneeName, assigneeAvatarUrl, assigneeId, assigneeLoginName, assigneeRealName, ldap, email,
   }) => (
     <React.Fragment>
       <UserHead
@@ -115,6 +115,8 @@ export default class SwimLaneHeader extends Component {
           name: assigneeName,
           realName: assigneeRealName,
           avatar: assigneeAvatarUrl,
+          ldap,
+          email,
         }}
       />
       <span>{assigneeName}</span>
@@ -171,7 +173,7 @@ export default class SwimLaneHeader extends Component {
                   ScrumBoardStore.setTransFromData(parentIssue, parentIssue.issueId);
                 }}
               >
-                {'移动到done'}
+                移动到done
               </Button>
             ) : null
           }

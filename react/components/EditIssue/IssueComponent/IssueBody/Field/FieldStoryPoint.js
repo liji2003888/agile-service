@@ -2,14 +2,13 @@ import React, { Component } from 'react';
 import { observer, inject } from 'mobx-react';
 import { withRouter } from 'react-router-dom';
 import { injectIntl } from 'react-intl';
-import TextEditToggle from '../../../../TextEditToggle';
-import { updateIssue } from '../../../../../api/NewIssueApi';
-import SelectNumber from '../../../../SelectNumber';
+import { issueApi } from '@/api';
+import SelectNumber from '@/components/select/select-number';
+import TextEditToggle from '@/components/TextEditTogglePro';
 
-const { Text, Edit } = TextEditToggle;
 @inject('AppState')
 @observer class FieldStoryPoint extends Component {
-  updateIssueField = (value) => {  
+  updateIssueField = (value) => {
     const {
       store, onUpdate, reloadIssue, field,
     } = this.props;
@@ -24,7 +23,7 @@ const { Text, Edit } = TextEditToggle;
       objectVersionNumber,
       [fieldCode]: value === '' ? null : value,
     };
-    updateIssue(obj)
+    issueApi.update(obj)
       .then(() => {
         if (onUpdate) {
           onUpdate();
@@ -39,7 +38,7 @@ const { Text, Edit } = TextEditToggle;
     const { store, field, disabled } = this.props;
     const issue = store.getIssue;
     const { fieldCode, fieldName } = field;
-    const { [fieldCode]: value } = issue;
+    const { [fieldCode]: value, typeCode } = issue;
 
     return (
       <div className="line-start mt-10" style={{ width: '100%' }}>
@@ -51,18 +50,16 @@ const { Text, Edit } = TextEditToggle;
         <div className="c7n-value-wrapper" style={{ width: '80px' }}>
           <TextEditToggle
             formKey={fieldName}
-            disabled={disabled}
+            disabled={typeCode === 'feature' || disabled}
             onSubmit={this.updateIssueField}
-            originData={value ? String(value) : undefined}
+            initValue={value ? String(value) : undefined}
+            editor={({ submit }) => (
+              <SelectNumber onChange={submit} />
+            )}
           >
-            <Text>
-              <div style={{ whiteSpace: 'nowrap' }}>
-                {value ? `${value} ${fieldCode === 'storyPoints' ? '点' : '小时'}` : '无'}
-              </div>
-            </Text>
-            <Edit>
-              <SelectNumber getPopupContainer={() => document.body} autoFocus />
-            </Edit>
+            <div style={{ whiteSpace: 'nowrap' }}>
+              {value ? `${value} ${fieldCode === 'storyPoints' ? '点' : '小时'}` : '无'}
+            </div>
           </TextEditToggle>
         </div>
       </div>

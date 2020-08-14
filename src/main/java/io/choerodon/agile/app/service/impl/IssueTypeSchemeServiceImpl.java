@@ -1,9 +1,8 @@
 package io.choerodon.agile.app.service.impl;
 
-import com.github.pagehelper.PageHelper;
-import com.github.pagehelper.PageInfo;
-import io.choerodon.web.util.PageableHelper;
-import org.springframework.data.domain.Pageable;
+import io.choerodon.core.domain.Page;
+import io.choerodon.mybatis.pagehelper.PageHelper;
+import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 import io.choerodon.core.exception.CommonException;
 import io.choerodon.agile.api.vo.IssueTypeSchemeSearchVO;
 import io.choerodon.agile.api.vo.IssueTypeSchemeVO;
@@ -222,7 +221,7 @@ public class IssueTypeSchemeServiceImpl implements IssueTypeSchemeService {
 //        initScheme(projectId, organizationId, projectCode + "默认类型方案【项目群】", issueTypeMap.get(InitIssueType.FEATURE.getTypeCode()).getId(), SchemeApplyType.PROGRAM, issueTypeMap);
 //    }
 
-    private List<IssueTypeDTO> initOrganizationIssueType(Long organizationId, List<IssueTypeDTO> issueTypes) {
+    protected List<IssueTypeDTO> initOrganizationIssueType(Long organizationId, List<IssueTypeDTO> issueTypes) {
         if (issueTypes == null || issueTypes.isEmpty()) {
             //注册组织初始化问题类型
             issueTypeService.initIssueTypeByConsumeCreateOrganization(organizationId);
@@ -238,12 +237,11 @@ public class IssueTypeSchemeServiceImpl implements IssueTypeSchemeService {
     }
 
     @Override
-    public PageInfo<IssueTypeSchemeWithInfoVO> queryIssueTypeSchemeList(Pageable pageable, Long organizationId, IssueTypeSchemeSearchVO issueTypeSchemeSearchVO) {
-        PageInfo<Long> issueTypeSchemeIdsPage = PageHelper.startPage(pageable.getPageNumber(),
-                pageable.getPageSize(), PageableHelper.getSortSql(pageable.getSort())).doSelectPageInfo(() -> issueTypeSchemeMapper.selectIssueTypeSchemeIds(organizationId, issueTypeSchemeSearchVO));
-        List<IssueTypeSchemeWithInfoVO> issueTypeSchemeWithInfoVOList = new ArrayList<>(issueTypeSchemeIdsPage.getList().size());
-        if (issueTypeSchemeIdsPage.getList() != null && !issueTypeSchemeIdsPage.getList().isEmpty()) {
-            List<IssueTypeSchemeWithInfoDTO> issueTypeSchemeWithInfoList = issueTypeSchemeMapper.queryIssueTypeSchemeList(organizationId, issueTypeSchemeIdsPage.getList());
+    public Page<IssueTypeSchemeWithInfoVO> queryIssueTypeSchemeList(PageRequest pageRequest, Long organizationId, IssueTypeSchemeSearchVO issueTypeSchemeSearchVO) {
+        Page<Long> issueTypeSchemeIdsPage = PageHelper.doPageAndSort(pageRequest, () -> issueTypeSchemeMapper.selectIssueTypeSchemeIds(organizationId, issueTypeSchemeSearchVO));
+        List<IssueTypeSchemeWithInfoVO> issueTypeSchemeWithInfoVOList = new ArrayList<>(issueTypeSchemeIdsPage.getContent().size());
+        if (issueTypeSchemeIdsPage.getContent() != null && !issueTypeSchemeIdsPage.getContent().isEmpty()) {
+            List<IssueTypeSchemeWithInfoDTO> issueTypeSchemeWithInfoList = issueTypeSchemeMapper.queryIssueTypeSchemeList(organizationId, issueTypeSchemeIdsPage.getContent());
             issueTypeSchemeWithInfoVOList = modelMapper.map(issueTypeSchemeWithInfoList, new TypeToken<List<IssueTypeSchemeWithInfoVO>>() {
             }.getType());
             for (IssueTypeSchemeWithInfoVO type : issueTypeSchemeWithInfoVOList) {
@@ -266,7 +264,7 @@ public class IssueTypeSchemeServiceImpl implements IssueTypeSchemeService {
      * @param schemeApplyType
      * @param issueTypeMap
      */
-    private void initScheme(Long projectId, Long organizationId, String name, Long defaultIssueTypeId, String schemeApplyType, Map<String, IssueTypeDTO> issueTypeMap) {
+    protected void initScheme(Long projectId, Long organizationId, String name, Long defaultIssueTypeId, String schemeApplyType, Map<String, IssueTypeDTO> issueTypeMap) {
         //初始化敏捷问题类型方案
         IssueTypeSchemeDTO issueTypeScheme = new IssueTypeSchemeDTO();
         issueTypeScheme.setName(name);

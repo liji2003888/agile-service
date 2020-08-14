@@ -1,6 +1,8 @@
 package io.choerodon.agile.infra.dto;
 
-import io.choerodon.mybatis.entity.BaseDTO;
+import io.choerodon.mybatis.annotation.ModifyAudit;
+import io.choerodon.mybatis.annotation.VersionAudit;
+import io.choerodon.mybatis.domain.AuditDomain;
 
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -11,10 +13,12 @@ import javax.persistence.Table;
  * @author peng.jiang@hand-china.com
  */
 @Table(name = "fd_state_machine_scheme_config")
-public class StateMachineSchemeConfigDTO extends BaseDTO {
+@ModifyAudit
+@VersionAudit
+public class StateMachineSchemeConfigDTO extends AuditDomain {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue
     private Long id;
     private Long schemeId;
     private Long issueTypeId;
@@ -22,6 +26,29 @@ public class StateMachineSchemeConfigDTO extends BaseDTO {
     private Boolean isDefault;
     private Integer sequence;
     private Long organizationId;
+
+    public StateMachineSchemeConfigDTO() {
+    }
+
+    public StateMachineSchemeConfigDTO(Long schemeId, Long issueTypeId, Long organizationId) {
+        this.schemeId = schemeId;
+        this.issueTypeId = issueTypeId;
+        this.organizationId = organizationId;
+    }
+
+    public StateMachineSchemeConfigDTO(Long stateMachineId, Boolean isDefault, Long organizationId) {
+        this.stateMachineId = stateMachineId;
+        this.isDefault = isDefault;
+        this.organizationId = organizationId;
+    }
+
+    public StateMachineSchemeConfigDTO(Long schemeId, Long issueTypeId, Long stateMachineId, Boolean isDefault, Long organizationId) {
+        this.schemeId = schemeId;
+        this.issueTypeId = issueTypeId;
+        this.stateMachineId = stateMachineId;
+        this.isDefault = isDefault;
+        this.organizationId = organizationId;
+    }
 
     public Long getId() {
         return id;

@@ -5,9 +5,11 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
+
 import io.swagger.annotations.ApiModelProperty;
 
 import io.choerodon.agile.infra.utils.StringUtil;
+import org.hzero.starter.keyencrypt.core.Encrypt;
 
 /**
  * Created by WangZhe@choerodon.io on 2019-06-28.
@@ -16,6 +18,7 @@ import io.choerodon.agile.infra.utils.StringUtil;
 public class IssueListFieldKVVO {
 
     @ApiModelProperty(value = "问题主键id")
+    @Encrypt
     private Long issueId;
 
     @ApiModelProperty(value = "问题编号")
@@ -28,15 +31,18 @@ public class IssueListFieldKVVO {
     private String summary;
 
     @ApiModelProperty(value = "经办人id")
+    @Encrypt
     private Long assigneeId;
 
     @ApiModelProperty(value = "报告人id")
+    @Encrypt
     private Long reporterId;
 
     @ApiModelProperty(value = "项目id")
     private Long projectId;
 
     @ApiModelProperty(value = "问题类型id")
+    @Encrypt
     private Long issueTypeId;
 
     @ApiModelProperty(value = "经办人名称")
@@ -67,6 +73,7 @@ public class IssueListFieldKVVO {
     private String epicName;
 
     @ApiModelProperty(value = "史诗id")
+    @Encrypt(ignoreValue = {"0"})
     private Long epicId;
 
     @ApiModelProperty(value = "史诗颜色")
@@ -74,6 +81,9 @@ public class IssueListFieldKVVO {
 
     @ApiModelProperty(value = "故事点")
     private BigDecimal storyPoints;
+
+    @Encrypt(ignoreValue = {"0"})
+    private Long parentId;
 
     @ApiModelProperty(value = "如果问题类型是特性，返回特性类别:business、enabler")
     private String featureType;
@@ -93,6 +103,9 @@ public class IssueListFieldKVVO {
     @ApiModelProperty(value = "问题类型DTO")
     private IssueTypeVO issueTypeVO;
 
+    @ApiModelProperty(value = "创建时间")
+    private Date creationDate;
+
     @ApiModelProperty(value = "最后更新时间")
     private Date lastUpdateDate;
 
@@ -110,6 +123,9 @@ public class IssueListFieldKVVO {
 
     @ApiModelProperty(value = "自定义字段kv")
     private Map<String, Object> foundationFieldValue;
+
+    @ApiModelProperty(value = "项目信息")
+    private ProjectVO projectVO;
 
     public List<IssueSprintVO> getIssueSprintVOS() {
         return issueSprintVOS;
@@ -158,6 +174,14 @@ public class IssueListFieldKVVO {
 
     public void setEpicColor(String epicColor) {
         this.epicColor = epicColor;
+    }
+
+    public Date getCreationDate() {
+        return creationDate;
+    }
+
+    public void setCreationDate(Date creationDate) {
+        this.creationDate = creationDate;
     }
 
     public Date getLastUpdateDate() {
@@ -368,8 +392,24 @@ public class IssueListFieldKVVO {
         this.foundationFieldValue = foundationFieldValue;
     }
 
+    public Long getParentId() {
+        return parentId;
+    }
+
+    public void setParentId(Long parentId) {
+        this.parentId = parentId;
+    }
+
     @Override
     public String toString() {
         return StringUtil.getToString(this);
+    }
+
+    public ProjectVO getProjectVO() {
+        return projectVO;
+    }
+
+    public void setProjectVO(ProjectVO projectVO) {
+        this.projectVO = projectVO;
     }
 }

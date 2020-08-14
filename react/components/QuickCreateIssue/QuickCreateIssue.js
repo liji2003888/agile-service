@@ -3,10 +3,10 @@ import PropTypes from 'prop-types';
 import {
   Button, Icon, Dropdown, Input, Menu, Form,
 } from 'choerodon-ui';
+import { getProjectId } from '@/utils/common';
+import { issueApi, fieldApi } from '@/api';
 import TypeTag from '../TypeTag';
 import { deBounce } from './Utils';
-import { getProjectId } from '../../common/utils';
-import { createIssue, createIssueField } from '../../api/NewIssueApi';
 import './QuickCreateIssue.less';
 
 const debounceCallback = deBounce(500);
@@ -34,7 +34,9 @@ class QuickCreateIssue extends Component {
 
   handleCreate = () => {
     const { currentTypeCode } = this.state;
-    const { form, issueTypes } = this.props;
+    const {
+      form, issueTypes, sprintId, epicId, versionIssueRelVOList, chosenFeatureId,
+    } = this.props;
     form.validateFields((err, values) => {
       const { summary } = values;
       if (summary && summary.trim()) {
@@ -50,25 +52,26 @@ class QuickCreateIssue extends Component {
                 priorityId: defaultPriority.id,
                 projectId: getProjectId(),
                 programId: getProjectId(),          
-                epicId: 0,
+                epicId: epicId || 0,
                 summary: summary.trim(),
                 issueTypeId: currentType.id,
                 typeCode: currentType.typeCode,
                 parentIssueId: 0,       
                 relateIssueId: 0,   
                 featureVO: {},
-                sprintId: 0,      
+                sprintId: sprintId || 0,      
                 epicName: currentTypeCode === 'issue_epic' ? summary.trim() : undefined,    
                 componentIssueRelVOList: [],
                 description: '',
                 issueLinkCreateVOList: [],
                 labelIssueRelVOList: [],
-                versionIssueRelVOList: [],
+                versionIssueRelVOList: versionIssueRelVOList || [],
+                featureId: currentType.typeCode === 'story' ? chosenFeatureId : 0,
               };
               this.setState({
                 loading: true,
               });
-              createIssue(issue).then((res) => {
+              issueApi.create(issue).then((res) => {
                 this.setState({
                   loading: false,
                   create: false,
@@ -78,8 +81,7 @@ class QuickCreateIssue extends Component {
                   context: res.typeCode,
                   pageCode: 'agile_issue_create',
                 };
-                
-                createIssueField(res.issueId, dto);
+                fieldApi.quickCreateDefault(res.issueId, dto);
                 if (onCreate) {
                   onCreate(res);
                 }
@@ -101,6 +103,7 @@ class QuickCreateIssue extends Component {
     } = this.state;
     const { issueTypes, form: { getFieldDecorator } } = this.props;    
     const currentType = issueTypes.find(t => t.typeCode === currentTypeCode);
+
     const typeList = (
       <Menu
         style={{
@@ -137,7 +140,7 @@ class QuickCreateIssue extends Component {
       >
         {
           create ? (
-            <Form onSubmit={this.handleCreate} style={{ width: '100%' }}>
+            <Form style={{ width: '100%' }}>
               <div style={{ display: 'block', width: '100%' }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <Dropdown overlay={typeList} trigger={['click']}>
@@ -158,6 +161,8 @@ class QuickCreateIssue extends Component {
                       <Input
                         className="hidden-label"
                         autoFocus
+                        autoComplete="on"
+                        onPressEnter={this.handleCreate}
                         maxLength={44}
                         placeholder="请输入问题概要"
                       />,
@@ -166,11 +171,12 @@ class QuickCreateIssue extends Component {
                   <Button
                     funcType="raised"
                     type="primary"
-                    htmlType="submit"
+                    // htmlType="submit"
+                    onClick={this.handleCreate}
                     style={{ margin: '0 10px' }}
                     loading={loading}                   
                   >
-                    {'确定'}
+                    确定
                   </Button>
                   <Button
                     funcType="raised"
@@ -180,7 +186,7 @@ class QuickCreateIssue extends Component {
                       });
                     }}
                   >
-                  取消
+                    取消
                   </Button>
                 </div>
               </div>
@@ -195,7 +201,7 @@ class QuickCreateIssue extends Component {
                 });
               }}
             >
-                创建问题
+              创建问题
             </Button>
           )
         }

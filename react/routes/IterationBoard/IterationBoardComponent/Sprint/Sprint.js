@@ -1,7 +1,8 @@
 import React, { Component } from 'react';
-import { axios, stores } from '@choerodon/boot';
+import { stores } from '@choerodon/boot';
 import { Spin, Tooltip } from 'choerodon-ui';
 import { withRouter } from 'react-router-dom';
+import { sprintApi } from '@/api';
 import EmptyBlockDashboard from '../../../../components/EmptyBlockDashboard';
 import pic from '../EmptyPics/no_sprint.svg';
 import UserHead from '../../../../components/UserHead';
@@ -18,15 +19,12 @@ class Sprint extends Component {
     };
   }
 
-  componentWillReceiveProps(nextProps) {
+  componentDidMount() {
     const { sprintId } = this.props;
-    if (nextProps.sprintId !== sprintId) {
-      const newSprintId = nextProps.sprintId;
-      this.setState({
-        sprintId: newSprintId,
-      });
-      this.loadSprintInfo(newSprintId);
-    }
+    this.setState({
+      sprintId,
+    });
+    this.loadSprintInfo(sprintId);
   }
 
   loadSprintInfo(sprintId) {
@@ -37,15 +35,12 @@ class Sprint extends Component {
       });
     } else {
       this.setState({ loading: true });
-      const projectId = AppState.currentMenuType.id;
-      const orgId = AppState.currentMenuType.organizationId;
-      axios.get(`/agile/v1/projects/${projectId}/iterative_worktable/sprint/${orgId}?sprintId=${sprintId}`)
-        .then((res) => {
-          this.setState({
-            sprintInfo: res,
-            loading: false,
-          });
+      sprintApi.getSprintCombineOrgId(sprintId).then((res) => {
+        this.setState({
+          sprintInfo: res,
+          loading: false,
         });
+      });
     }
   }
 
@@ -122,8 +117,8 @@ class Sprint extends Component {
                             user={{
                               id: user.assigneeId,
                               name: user.assigneeName,
-                              loginName: user.assigneeLoginName,
-                              realName: user.assigneeRealName,
+                              loginName: user.assigneeName,
+                              realName: user.assigneeName,
                               avatar: user.imageUrl,
                             }}
                             hiddenText

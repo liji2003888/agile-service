@@ -4,12 +4,13 @@ import io.choerodon.agile.api.vo.SprintWorkCalendarVO;
 import io.choerodon.agile.api.vo.WorkCalendarRefCreateVO;
 import io.choerodon.agile.api.vo.WorkCalendarRefVO;
 import io.choerodon.agile.app.service.WorkCalendarRefService;
-import io.choerodon.core.annotation.Permission;
-import io.choerodon.core.enums.ResourceType;
+
+import io.choerodon.core.iam.ResourceLevel;
+import io.choerodon.swagger.annotation.Permission;
 import io.choerodon.core.exception.CommonException;
-import io.choerodon.core.iam.InitRoleCode;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import org.hzero.starter.keyencrypt.core.Encrypt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,13 +31,13 @@ public class WorkCalendarRefController {
     @Autowired
     private WorkCalendarRefService workCalendarRefService;
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation(value = "创建冲刺工作日历")
     @PostMapping(value = "/sprint/{sprint_id}")
     public ResponseEntity<WorkCalendarRefVO> createSprintWorkCalendarRef(@ApiParam(value = "项目id", required = true)
                                                                           @PathVariable(name = "project_id") Long projectId,
                                                                          @ApiParam(value = "冲刺id", required = true)
-                                                                          @PathVariable(name = "sprint_id") Long sprintId,
+                                                                          @PathVariable(name = "sprint_id") @Encrypt Long sprintId,
                                                                          @ApiParam(value = "创建冲刺工作日对象", required = true)
                                                                           @RequestBody @Valid WorkCalendarRefCreateVO workCalendarRefCreateVO) {
         return Optional.ofNullable(workCalendarRefService.createWorkCalendarRef(projectId, sprintId, workCalendarRefCreateVO))
@@ -44,7 +45,7 @@ public class WorkCalendarRefController {
                 .orElseThrow(() -> new CommonException("error.workCalendarRef.create"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("获取冲刺工作日历设置")
     @GetMapping(value = "/sprint")
     public ResponseEntity<SprintWorkCalendarVO> querySprintWorkCalendarRefs(@ApiParam(value = "项目id", required = true)
@@ -56,7 +57,7 @@ public class WorkCalendarRefController {
                 .orElseThrow(() -> new CommonException("error.workCalendarRef.get"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation(value = "创建项目工作日历")
     @PostMapping(value = "/project")
     public ResponseEntity<WorkCalendarRefVO> createProjectWorkCalendarRef(@ApiParam(value = "项目id", required = true)
@@ -68,7 +69,7 @@ public class WorkCalendarRefController {
                 .orElseThrow(() -> new CommonException("error.workCalendarRef.create"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("获取项目工作日历设置")
     @GetMapping(value = "/project")
     public ResponseEntity<List<WorkCalendarRefVO>> queryProjectWorkCalendarRefs(@ApiParam(value = "项目id", required = true)
@@ -80,13 +81,13 @@ public class WorkCalendarRefController {
                 .orElseThrow(() -> new CommonException("error.workCalendarRef.get"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("删除项目工作日历")
     @DeleteMapping(value = "/{calendar_id}")
     public ResponseEntity deleteProjectWorkCalendarRef(@ApiParam(value = "项目id", required = true)
                                                        @PathVariable(name = "project_id") Long projectId,
                                                        @ApiParam(value = "calendar_id", required = true)
-                                                       @PathVariable(name = "calendar_id") Long calendarId) {
+                                                       @PathVariable(name = "calendar_id") @Encrypt Long calendarId) {
         workCalendarRefService.deleteWorkCalendarRef(projectId, calendarId);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }

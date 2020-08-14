@@ -1,54 +1,65 @@
-import React, { Component } from 'react';
-import { observer, inject } from 'mobx-react';
+import React from 'react';
+import { observer } from 'mobx-react';
 import classnames from 'classnames';
 import { Collapse } from 'choerodon-ui';
+import { isEqual } from 'lodash';
 import './RenderSwimLaneContext.less';
 import SwimLaneHeader from './SwimLaneHeader';
 
 const { Panel } = Collapse;
+const getPanelKey = (mode, issue) => {
+  const modeMap = new Map([
+    ['swimlane_none', 'swimlaneContext%all'],
+    ['assignee', `swimlaneContext%${issue.assigneeId || issue.type}`],
+    ['swimlane_epic', `swimlaneContext%${issue.epicId || issue.type}`],
+    ['parent_child', `swimlaneContext%${issue.issueId || issue.type || 'other'}`],
+  ]);
+  return modeMap.get(mode);
+};
 
-@inject('AppState')
+const getDefaultExpanded = (mode, issueArr, key) => {
+  let retArr = issueArr;
+  if (mode === 'parent_child') {
+    retArr = retArr.filter(issue => !issue.isComplish || key === 'other');
+  }
+  return retArr.map(issue => getPanelKey(mode, issue));
+};
 @observer
 class SwimLaneContext extends React.Component {
-  constructor(props) {
+  constructor(props) {    
     super(props);
     this.state = {
-      activeKey: this.getDefaultExpanded(props.mode, [...props.parentIssueArr.values(), props.otherIssueWithoutParent]),
+      activeKey: [],
+      issues: [],
     };
   }
 
-  componentWillReceiveProps(nextProps, nextState) {
-    this.setState({
-      activeKey: this.getDefaultExpanded(nextProps.mode, [...nextProps.parentIssueArr.values(), nextProps.otherIssueWithoutParent]),
-    });
+  static getDerivedStateFromProps(props, state) {
+    const { mode } = props;
+    const issues = [...props.parentIssueArr.values(), props.otherIssueWithoutParent];
+    const activeKey = getDefaultExpanded(mode, issues).slice(0, 15);
+    const activeKeyFromOld = getDefaultExpanded(state.mode, state.issues).slice(0, 15);
+    if (!isEqual(activeKey, activeKeyFromOld)) {
+      return {
+        mode,
+        issues,
+        activeKey,
+      };
+    } else {
+      return null;
+    }
   }
 
-  getPanelKey = (mode, issue) => {
-    const modeMap = new Map([
-      ['swimlane_none', 'swimlaneContext-all'],
-      ['assignee', `swimlaneContext-${issue.assigneeId || issue.type}`],
-      ['swimlane_epic', `swimlaneContext-${issue.epicId || issue.type}`],
-      ['parent_child', `swimlaneContext-${issue.issueId || issue.type || 'other'}`],
-    ]);
-    return modeMap.get(mode);
-  };
-
-  getDefaultExpanded = (mode, issueArr, key) => {
-    let retArr = issueArr;
-    if (mode === 'parent_child') {
-      retArr = retArr.filter(issue => !issue.isComplish || key === 'other');
-    }
-    return retArr.map(issue => this.getPanelKey(mode, issue));
-  };
 
   getPanelItem = (key, parentIssue = null) => {
     const {
       children, mode, fromEpic, parentIssueArr,
     } = this.props;
+    const panelKey = getPanelKey(mode, parentIssue, key);
     return (
       <Panel
         showArrow={mode !== 'swimlane_none'}
-        key={this.getPanelKey(mode, parentIssue, key)}
+        key={panelKey}
         className={classnames('c7n-swimlaneContext-container', {
           shouldBeIndent: fromEpic,
           noStoryInEpic: fromEpic && Array.from(parentIssueArr).length === 0,
@@ -77,12 +88,12 @@ class SwimLaneContext extends React.Component {
   keyConverter = (key, mode) => {
     const { epicPrefix } = this.props;
     const retMap = new Map([
-      ['parent_child', `parent_child-${key}`],
-      ['assignee', `assignee-${key}`],
-      ['swimlane_none', 'swimlane_none-other'],
+      ['parent_child', `parent_child%${key}`],
+      ['assignee', `assignee%${key}`],
+      ['swimlane_none', 'swimlane_none%other'],
     ]);
     if (epicPrefix) {
-      return `${epicPrefix}-${key}`;
+      return `${epicPrefix}%${key}`;
     }
     return retMap.get(mode);
   };
@@ -95,7 +106,7 @@ class SwimLaneContext extends React.Component {
         activeKey={activeKey}
         onChange={this.panelOnChange}
         bordered={false}
-        forceRender
+        destroyInactivePanel
       >
         {Array.from(parentIssueArr).map(([key, value]) => this.getPanelItem(key, value))}
         {otherIssueWithoutParent.length && this.getPanelItem('other', otherIssueWithoutParent, 'fromOther')}

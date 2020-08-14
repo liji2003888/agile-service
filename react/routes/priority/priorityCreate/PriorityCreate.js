@@ -1,19 +1,18 @@
+import { stores } from '@choerodon/boot';
 import {
-  Content, Header, Page, stores
-} from '@choerodon/boot';
-import {
-  Button, Card, Form, Icon, Input, message, Modal, Spin, Table, Tooltip, Checkbox
+  Form, Input, message, Modal, Checkbox,
 } from 'choerodon-ui';
 import { observer } from 'mobx-react';
+import _ from 'lodash';
 import React, { Component } from 'react';
 import { FormattedMessage, injectIntl } from 'react-intl';
 import { CompactPicker } from 'react-color';
 
 import './priorityCreate.less';
+import { priorityApi } from '@/api';
 
 const FormItem = Form.Item;
 const { Sidebar } = Modal;
-const { confirm } = Modal;
 const { TextArea } = Input;
 
 const { AppState } = stores;
@@ -40,12 +39,12 @@ class PriorityCreate extends Component {
         const orgId = AppState.currentMenuType.organizationId;
 
         try {
-          await PriorityStore.createPriority(orgId, {
+          await priorityApi.create({
             name,
             description: des,
             default: !!isDefault,
             colour: priorityColor,
-            objectVersionNumber: 1,
+            // objectVersionNumber: 1,
           });
           message.success('添加成功');
           PriorityStore.loadPriorityList(orgId);
@@ -87,17 +86,16 @@ class PriorityCreate extends Component {
     });
   };
 
-  checkName = async (rule, value, callback) => {
+  checkName = _.debounce(async (rule, value, callback) => {
     // 名称检查
-    const { PriorityStore, intl } = this.props;
-    const orgId = AppState.currentMenuType.organizationId;
-    const res = await PriorityStore.checkName(orgId, value);
+    const { intl } = this.props;
+    const res = await priorityApi.checkName(value);
     if (res) {
       callback(intl.formatMessage({ id: 'priority.create.name.error' }));
     } else {
       callback();
     }
-  };
+  }, 460);
 
   hideSidebar() {
     const { PriorityStore, form } = this.props;

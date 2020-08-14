@@ -17,7 +17,7 @@ import io.choerodon.agile.infra.mapper.StateMachineSchemeConfigMapper;
 import io.choerodon.agile.infra.mapper.StateMachineSchemeMapper;
 import io.choerodon.core.exception.CommonException;
 import io.choerodon.core.oauth.DetailsHelper;
-import io.choerodon.mybatis.entity.Criteria;
+import org.hzero.mybatis.common.Criteria;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
 import org.slf4j.Logger;
@@ -140,9 +140,9 @@ public class StateMachineSchemeConfigServiceImpl implements StateMachineSchemeCo
         //更新草稿
         StateMachineSchemeConfigDraftDTO defaultConfig = configDraftMapper.selectDefault(organizationId, schemeId);
         defaultConfig.setStateMachineId(stateMachineId);
-        Criteria criteria = new Criteria();
-        criteria.update("stateMachineId");
-        configDraftMapper.updateByPrimaryKeyOptions(defaultConfig, criteria);
+//        Criteria criteria = new Criteria();
+//        criteria.update("stateMachineId");
+        configDraftMapper.updateOptional(defaultConfig, "stateMachineId");
     }
 
     @Override
@@ -311,9 +311,9 @@ public class StateMachineSchemeConfigServiceImpl implements StateMachineSchemeCo
         //更新状态机方案状态为：活跃
         StateMachineSchemeDTO scheme = schemeMapper.selectByPrimaryKey(schemeId);
         scheme.setStatus(StateMachineSchemeStatus.ACTIVE);
-        Criteria criteria = new Criteria();
-        criteria.update("status");
-        schemeMapper.updateByPrimaryKeyOptions(scheme, criteria);
+//        Criteria criteria = new Criteria();
+//        criteria.update("status");
+        schemeMapper.updateOptional(scheme, "status");
         //发布后，再进行状态增加与减少的判断，并发送saga
         ChangeStatus changeStatus = new ChangeStatus(addStatusIds, deleteStatusIds);
         //发布之前，更新deployStatus为doing
@@ -473,9 +473,9 @@ public class StateMachineSchemeConfigServiceImpl implements StateMachineSchemeCo
         //更新状态机方案状态为：活跃
         StateMachineSchemeDTO scheme = schemeMapper.selectByPrimaryKey(schemeId);
         scheme.setStatus(StateMachineSchemeStatus.ACTIVE);
-        Criteria criteria = new Criteria();
-        criteria.update("status");
-        schemeMapper.updateByPrimaryKeyOptions(scheme, criteria);
+//        Criteria criteria = new Criteria();
+//        criteria.update("status");
+        schemeMapper.updateOptional(scheme, "status");
         return stateMachineSchemeService.querySchemeWithConfigById(false, organizationId, schemeId);
     }
 
@@ -530,4 +530,47 @@ public class StateMachineSchemeConfigServiceImpl implements StateMachineSchemeCo
             }
         }
     }
+
+    @Override
+    public Long queryStatusMachineBySchemeIdAndIssueType(Long organizationId, Long stateMachineSchemeId, Long issueTypeId) {
+        StateMachineSchemeConfigDTO config = new StateMachineSchemeConfigDTO(stateMachineSchemeId,issueTypeId,organizationId);
+        List<StateMachineSchemeConfigDTO> configs = configMapper.select(config);
+        Long stateMachineId = null;
+        if (!configs.isEmpty()) {
+            // 默认使用查询出来的第一个状态机
+            Long currentStateMachineId = configs.get(0).getStateMachineId();
+            // 校验在是否有其他问题类型共用一个状态机
+            StateMachineSchemeConfigDTO configDTO = new StateMachineSchemeConfigDTO(currentStateMachineId,false,organizationId);
+            List<StateMachineSchemeConfigDTO> select = configMapper.select(configDTO);
+            if (select.size() <= 1) {
+                return currentStateMachineId;
+            }
+            // 复制第一个的状态机的节点和转换
+            stateMachineId = stateMachineService.copyStateMachine(organizationId, currentStateMachineId,issueTypeId);
+            // 删除原来的配置
+            configs.forEach(v -> configMapper.deleteByPrimaryKey(v.getId()));
+            // 新增状态机方案配置
+            insert(organizationId, stateMachineId, stateMachineSchemeId, issueTypeId, false);
+        } else {
+            // 复制默认状态机的节点和转换
+            Long currentStateMachineId = configMapper.selectDefault(organizationId, stateMachineSchemeId).getStateMachineId();
+            stateMachineId = stateMachineService.copyStateMachine(organizationId, currentStateMachineId,issueTypeId);
+            insert(organizationId, stateMachineId, stateMachineSchemeId, issueTypeId,false);
+        }
+        return stateMachineId;
+    }
+
+    private void insert(Long organizationId, Long stateMachineId, Long stateMachineSchemeId, Long issueTypeId, boolean isDefault) {
+        StateMachineSchemeConfigDTO configDTO = new StateMachineSchemeConfigDTO();
+        configDTO.setOrganizationId(organizationId);
+        configDTO.setSchemeId(stateMachineSchemeId);
+        configDTO.setStateMachineId(stateMachineId);
+        configDTO.setDefault(isDefault);
+        configDTO.setSequence(0);
+        configDTO.setIssueTypeId(issueTypeId);
+        if (configMapper.insert(configDTO) != 1) {
+            throw new CommonException("error.insert.state.machine.scheme.config");
+        }
+    }
+
 }

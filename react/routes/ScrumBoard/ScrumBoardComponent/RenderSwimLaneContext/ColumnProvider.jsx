@@ -2,9 +2,9 @@
 import React from 'react';
 import classnames from 'classnames';
 import { inject, observer } from 'mobx-react';
-import ScrumBoardStore from '../../../../stores/project/scrumBoard/ScrumBoardStore';
+import ScrumBoardStore from '@/stores/project/scrumBoard/ScrumBoardStore';
+import CSSBlackMagic from '@/components/CSSBlackMagic';
 import ColumnCouldDragOn from './ColumnCouldDragOn';
-import CSSBlackMagic from '../../../../components/CSSBlackMagic';
 
 @CSSBlackMagic
 @observer
@@ -19,7 +19,7 @@ export default class ColumnProvider extends React.Component {
       <React.Fragment key={columnObj.columnId}>
         <ColumnCouldDragOn keyId={keyId} dragOn={ScrumBoardStore.getCurrentDrag === keyId} />
         <div
-          className={classnames('c7n-swimlaneContext-itemBodyColumn', `${className} ${keyId}`, {
+          className={classnames('c7n-swimlaneContext-itemBodyColumn', `${className} ${keyId.replace(/[^\w]/g, '')}`, {
             greaterThanMax: columnConstraintsIsOn && columnObj.maxNum !== null && ScrumBoardStore.getAllColumnCount.get(columnObj.columnId) > columnObj.maxNum,
             lessThanMin: columnConstraintsIsOn && columnObj.minNum !== null && ScrumBoardStore.getAllColumnCount.get(columnObj.columnId) < columnObj.minNum,
           })}

@@ -1,19 +1,5 @@
 @import '~choerodon-ui/lib/style/themes/default';
-// .page-header {
-//   .c7n-boot-header-banner +.{
 
-//   }
-// }
-
-// // .resize-able {
-// //   position: fixed;
-// //   right: 0;
-// //   top: 50;
-// //   bottom: 0;
-// //   z-index: 101;
-// //   overflow: hidden;
-
-// // }
 .c7n-agile-EditIssue {
   min-width: 4.4rem;
   height: 100%;
@@ -22,10 +8,6 @@
   overflow: hidden;
   flex: 1;
   position: relative;
-
-  .c7n-tabs {
-    min-height: calc(~"100% - .5rem");
-  }
 
   &-divider {
     position: relative;
@@ -77,15 +59,15 @@
     }
   }
 
-  #detail {
+  #detail, #wsjf {
     .line-start {
       width: calc(~'50% - 10px');
       margin-right: 10px;
-      // overflow: hidden;
     }
 
     .c7n-value-wrapper {
       flex: 1;
+      max-width: 2rem;
       // overflow: hidden;
     }
 
@@ -160,12 +142,6 @@
   .c7n-upload {
     display: flex !important;
     justify-content: flex-end !important;
-  }
-
-  .assignee {
-    .c7n-input-placeholder {
-      display: none;
-    }
   }
 
   .c7n-description {
@@ -470,4 +446,7 @@
       margin-top: -0.04rem;
     }
   }
+}
+.c7n-agile-featureField-SelectDropDown, .c7n-agile-epicField-SelectDropDown {
+  min-width: 180px !important;
 }

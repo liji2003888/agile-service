@@ -1,21 +1,38 @@
 import React, { useContext } from 'react';
 import {
-  Dropdown, Icon, Menu, Button, Modal,
-} from 'choerodon-ui'; 
+  Dropdown, Menu, Button, Modal,
+} from 'choerodon-ui';
 import { Modal as ModalPro } from 'choerodon-ui/pro';
+import { issueApi } from '@/api';
+import useIsOwner from '@/hooks/useIsOwner';
 import EditIssueContext from '../stores';
 import Assignee from '../../Assignee';
-import { deleteIssue } from '../../../api/NewIssueApi';
 
 const { confirm } = Modal;
 const IssueDropDown = ({
-  onDeleteIssue, loginUserId, hasPermission, reloadIssue, 
+  onDeleteIssue, loginUserId, reloadIssue,
 }) => {
-  const { store, onUpdate } = useContext(EditIssueContext);
+  const {
+    store, onUpdate, isOnlyAgileProject, applyType,
+  } = useContext(EditIssueContext);
+  const [isOwner] = useIsOwner();
   const issue = store.getIssue;
   const {
-    issueId, typeCode, createdBy, issueNum, subIssueVOList = [], assigneeId, objectVersionNumber, 
+    issueId, typeCode, createdBy, issueNum, subIssueVOList = [], assigneeId, objectVersionNumber, activePi,
   } = issue;
+  const disableFeatureDeleteWhilePiDoing = typeCode === 'feature' && activePi && activePi.statusCode === 'doing';
+  let disableDelete = true;
+  // 管理员什么时候都能删
+  if (isOwner) {
+    disableDelete = false;
+    // feature在doing的pi里不能删
+  } else if (disableFeatureDeleteWhilePiDoing) {
+    disableDelete = true;
+  } else {
+    // 可以删自己创建的
+    disableDelete = loginUserId !== createdBy;
+  }
+
   const handleDeleteIssue = () => {
     confirm({
       width: 560,
@@ -32,7 +49,7 @@ const IssueDropDown = ({
           </div>
         ),
       onOk() {
-        return deleteIssue(issueId)
+        return issueApi.delete(issueId, createdBy)
           .then((res) => {
             if (onDeleteIssue) {
               onDeleteIssue();
@@ -63,7 +80,7 @@ const IssueDropDown = ({
       ModalPro.open({
         title: '分配问题',
         children: <Assignee
-          issueId={issueId}         
+          issueId={issueId}
           assigneeId={assigneeId}
           objectVersionNumber={objectVersionNumber}
           onOk={() => {
@@ -88,75 +105,77 @@ const IssueDropDown = ({
   };
   const getMenu = () => (
     <Menu onClick={handleClickMenu}>
-      {!['feature'].includes(typeCode) && (
+      {!['feature', 'issue_epic'].includes(typeCode) && (
         <Menu.Item key="0">
-          {'登记工作日志'}
+          登记工作日志
         </Menu.Item>
       )}
       {
         <Menu.Item
           key="1"
-          disabled={loginUserId !== createdBy && !hasPermission}
+          disabled={disableDelete}
         >
-          {'删除'}
+          删除
         </Menu.Item>
       }
       {
-        ['sub_task', 'feature'].indexOf(typeCode) === -1 && (
+        ['sub_task', 'feature', 'issue_epic'].indexOf(typeCode) === -1 && !(typeCode === 'bug' && issue.relateIssueId) ? (
           <Menu.Item key="2">
-            {'创建子任务'}
+            创建子任务
           </Menu.Item>
-        )
+        ) : null
       }
       {
         ['story', 'task'].indexOf(typeCode) !== -1 && (
           <Menu.Item key="9">
-            {'创建缺陷'}
+            创建缺陷
           </Menu.Item>
         )
       }
-      <Menu.Item key="3">
-        {'复制问题'}
-      </Menu.Item>
+      {['feature'].indexOf(typeCode) === -1 && (
+        <Menu.Item key="3">
+          复制问题
+        </Menu.Item>
+      )}
       {
-        ['sub_task', 'feature'].indexOf(typeCode) === -1 && subIssueVOList.length === 0 && (
+        ['sub_task', 'feature', 'issue_epic'].indexOf(typeCode) === -1 && subIssueVOList.length === 0 && (
           <Menu.Item key="4">
-            {'转化为子任务'}
+            转化为子任务
           </Menu.Item>
         )
       }
       {
         typeCode === 'sub_task' && (
           <Menu.Item key="5">
-            {'类型转换'}
+            类型转换
           </Menu.Item>
         )
       }
       {
-        typeCode !== 'feature' && (
+        applyType !== 'program' && !isOnlyAgileProject && (
           <Menu.Item key="6">
-            {'创建分支'}
+            创建分支
           </Menu.Item>
         )
       }
       {
-        typeCode !== 'feature' && (
+        (typeCode !== 'feature' && typeCode !== 'issue_epic') && (
           <Menu.Item key="7">
-            {'分配问题'}
+            分配问题
           </Menu.Item>
         )
       }
       {
         typeCode === 'sub_task' && (
           <Menu.Item key="8">
-            {'修改父级'}
+            修改父级
           </Menu.Item>
         )
       }
       {
-        typeCode === 'bug' && (
+        typeCode === 'bug' && !subIssueVOList.length > 0 && (
           <Menu.Item key="10">
-            {'关联问题'}
+            关联问题
           </Menu.Item>
         )
       }
@@ -167,7 +186,7 @@ const IssueDropDown = ({
       overlay={getMenu()}
       trigger={['click']}
       getPopupContainer={trigger => trigger.parentNode}
-      placement="bottomRight"   
+      placement="bottomRight"
     >
       <Button icon="more_vert" />
     </Dropdown>

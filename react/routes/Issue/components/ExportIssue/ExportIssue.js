@@ -1,10 +1,11 @@
 import React, { Component } from 'react';
-import { stores, axios, Choerodon } from '@choerodon/boot';
+import { stores, Choerodon } from '@choerodon/boot';
 import { observer } from 'mobx-react';
 import { Modal, Radio } from 'choerodon-ui';
 import FileSaver from 'file-saver';
-import IssueStore from '@/stores/project/sprint/IssueStore/IssueStore';
-import transform from '../../utils';
+import IssueStore from '@/stores/project/issue/IssueStore';
+import { find } from 'lodash';
+import { issueApi } from '@/api';
 
 const RadioGroup = Radio.Group;
 const { AppState } = stores;
@@ -56,7 +57,7 @@ class ExportIssue extends Component {
       component: 'componentName',
     };
     const { tableRef } = this.props;
-    const columns = tableRef.current ? tableRef.current.tableStore.columns.filter(column => !column.hidden) : [];
+    const columns = tableRef.current ? tableRef.current.tableStore.columns.filter(column => column.name && !column.hidden) : [];
     return columns.map(column => fieldTransform[column.name] || column.name);
   };
 
@@ -64,11 +65,10 @@ class ExportIssue extends Component {
    * 输出 excel
    */
   exportExcel = () => {
-    const projectId = AppState.currentMenuType.id;
-    const orgId = AppState.currentMenuType.organizationId;
-    const { dataSet } = this.props;
-    const searchDTO = transform(dataSet.queryDataSet.current.toData());
+    const searchDTO = IssueStore.getCustomFieldFilters();
     const { mode } = this.state;
+    const { dataSet } = this.props;
+    const field = find([...dataSet.fields.values()], f => f.order);
     const tableShowColumns = mode === 'all' ? [] : this.getVisibleColumns();
     const search = {
       ...searchDTO,
@@ -77,7 +77,7 @@ class ExportIssue extends Component {
     this.setState({
       loading: true,
     });
-    axios.post(`/zuul/agile/v1/projects/${projectId}/issues/export?organizationId=${orgId}`, search, { responseType: 'arraybuffer' })
+    issueApi.export(search, field ? `${field.name},${field.order}` : undefined)
       .then((data) => {
         const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         const fileName = `${AppState.currentMenuType.name}.xlsx`;

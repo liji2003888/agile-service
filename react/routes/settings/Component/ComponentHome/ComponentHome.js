@@ -7,10 +7,10 @@ import {
   TabPage as Page, Header, Content, stores, Permission, Breadcrumb,
 } from '@choerodon/boot';
 import './ComponentHome.less';
+import TableAction from '@/components/TableAction';
 import CreateComponent from '../ComponentComponent/AddComponent';
 import EditComponent from '../ComponentComponent/EditComponent';
 import DeleteComponent from '../ComponentComponent/DeleteComponent';
-import TableAction from '@/components/TableAction';
 import UserHead from '../../../../components/UserHead';
 import Store from './stores';
 
@@ -110,7 +110,7 @@ function ComponentHome() {
       type={type}
       projectId={id}
       organizationId={orgId}
-      service={['agile-service.issue-component.updateComponent']}
+      service={['choerodon.code.project.setting.issue.ps.deletecomponent']}
     />
   );
 
@@ -128,7 +128,7 @@ function ComponentHome() {
         renderer={({ text: issueCount, record }) => (
           issueCount ? (
             <Link
-              to={`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&paramType=component&paramId=${record.get('componentId')}&paramName=${encodeURIComponent(`模块"${record.get('name')}"下的问题`)}`}
+              to={`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramType=component&paramId=${encodeURIComponent(record.get('componentId'))}&paramName=${encodeURIComponent(`模块"${record.get('name')}"下的问题`)}`}
             >
               {issueCount}
               {'issues'}              
@@ -162,18 +162,12 @@ function ComponentHome() {
     <Page
       className="c7n-component"
       service={[
-        'agile-service.issue-component.updateComponent',
-        'agile-service.issue-component.deleteComponent',
-        'agile-service.issue-component.createComponent',
-        'agile-service.issue-component.listByProjectId',
+        'choerodon.code.project.setting.issue.ps.component',
       ]}
     >
       <Header title="模块管理">
         <Permission
-          type={type}
-          projectId={id}
-          organizationId={orgId}
-          service={['agile-service.issue-component.createComponent']}
+          service={['choerodon.code.project.setting.issue.ps.createcomponent']}
         >
           <Button funcType="flat" onClick={openCreateModal}>
             <Icon type="playlist_add icon" />

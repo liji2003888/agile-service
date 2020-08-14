@@ -26,7 +26,7 @@ function PageDetail(props) {
     pageStore, AppState,
   } = context;
   const {
-    name, type, id, organizationId: orgId, 
+    name, type, id, organizationId: orgId, category,
   } = AppState.currentMenuType;
   const {
     pageDetailItem,
@@ -49,9 +49,6 @@ function PageDetail(props) {
     initCurrentMenuType();
     loadPageDetail();
   }, []);
-  useEffect(() => {
-    setHeight(document.getElementsByClassName('page-content')[0].clientHeight - 70);
-  });
   // componentWillUnmount
   useEffect(() => () => {
     pageStore.setPage([]);
@@ -126,22 +123,18 @@ function PageDetail(props) {
   const page = pageStore.getPageDetail;
   const { name: pageName, content = [] } = page;
   return (
-    <Page 
+    <Page
       className="c7n-page-detail"
       service={AppState.currentMenuType.type === 'project' ? [
-        'agile-service.project-page-field.listQuery',
-        'agile-service.project-page-field.adjustFieldOrder',
-        'agile-service.project-page-field.update',
+        'choerodon.code.project.setting.page.ps.scheme',
       ] : [
-        'agile-service.page-field.listQuery',
-        'agile-service.page-field.adjustFieldOrder',
-        'agile-service.page-field.update',
+        'choerodon.code.organization.setting.issue.page.ps.scheme',
       ]}
     >
       <Breadcrumb custom>
         <Item>{name}</Item>
         <Item>
-          <Link to={`/agile/page/scheme?type=${type}&id=${id}&name=${name}&category=AGILE&organizationId=${orgId}&orgId=${orgId}`}>页面</Link>
+          <Link to={`/agile/page/scheme?type=${type}&id=${id}&name=${name}&category=${category}&organizationId=${orgId}&orgId=${orgId}`}>页面</Link>
         </Item>
         <Item>{pageName}</Item>
       </Breadcrumb>

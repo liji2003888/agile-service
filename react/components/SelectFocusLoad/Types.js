@@ -2,23 +2,25 @@
 import React from 'react';
 import { Select } from 'choerodon-ui';
 import { find } from 'lodash';
-import UserHead from '../UserHead';
-import { getUsers, getUser } from '../../api/CommonApi';
 import {
-  loadEpics, loadProgramEpics, loadIssueTypes, loadPriorities,
-  loadComponents, loadLabels, loadVersions,
-  loadStatusList, loadIssuesInLink, loadSprints,
-} from '../../api/NewIssueApi';
-import IssueLinkType from '../../api/IssueLinkType';
+  userApi, componentApi, issueApi, epicApi, versionApi, issueTypeApi, commonApi, issueLabelApi, priorityApi, statusApi,
+} from '@/api';
+
+import { issueLinkTypeApi } from '@/api/IssueLinkType';
+import { featureApi, piApi, sprintApi } from '@/api';
+import { Tooltip } from 'choerodon-ui/pro';
+import UserHead from '../UserHead';
 import TypeTag from '../TypeTag';
 import StatusTag from '../StatusTag';
-
-// 避免选项中 加载更多 影响 typeof
+import { IsInProgramStore } from '../../exports';
+// 增加 typeof 避免选项中 加载更多 影响 
 const filterOption = (input, option) => option.props.children && typeof (option.props.children) === 'string' && option.props.children.toLowerCase().indexOf(
   input.toLowerCase(),
 ) >= 0;
-
-function transform(links) {
+const filterOptionByName = (input, option) => option.props.name && typeof (option.props.name) === 'string' && option.props.name.toLowerCase().indexOf(
+  input.toLowerCase(),
+) >= 0;
+export function transform(links) {
   // split active and passive
   const active = links.map(link => ({
     name: link.outWard,
@@ -38,13 +40,12 @@ function transform(links) {
 
   return active.concat(passive);
 }
-const { Option } = Select;
+const { Option, OptGroup } = Select;
 const issue_type_program = {
   props: {
     filterOption,
   },
-  request: () => new Promise(resolve => loadIssueTypes('program').then((issueTypes) => {
-    // const defaultType = find(issueTypes, { typeCode: 'feature' }).id;
+  request: () => new Promise(resolve => issueTypeApi.loadAllWithStateMachineId('program').then((issueTypes) => {
     resolve(issueTypes);
   })),
   render: issueType => (
@@ -64,7 +65,7 @@ const issue_type_program = {
 };
 export default {
   user: {
-    request: ({ filter, page }) => getUsers(filter, undefined, page).then(UserData => ({ ...UserData, list: UserData.list.filter(user => user.enabled) })),
+    request: ({ filter, page }) => userApi.getAllInProject(filter, page).then(UserData => ({ ...UserData, list: UserData.list.filter(user => user.enabled) })),
     render: user => (
       <Option key={user.id} value={user.id}>
         <div style={{
@@ -83,8 +84,8 @@ export default {
       const values = value instanceof Array ? value : [value];
       const requestQue = [];
       values.forEach((a) => {
-        if (a && typeof a === 'number' && !find(List, { id: a })) {
-          requestQue.push(getUser(a));
+        if (a && typeof a === 'string' && a !== '0' && !find(List, { id: a })) {
+          requestQue.push(userApi.getById(a));
         }
       });
       Promise.all(requestQue).then((users) => {
@@ -94,13 +95,13 @@ export default {
           }
         });
         resolve(extraList);
-      }).catch((err) => {
+      }).catch(() => {
         resolve(extraList);
       });
     }),
   },
   issue_status: {
-    request: () => loadStatusList('agile'),
+    request: () => statusApi.loadByProject('agile'),
     render: status => (
       <Option
         key={status.id}
@@ -112,7 +113,7 @@ export default {
     ),
   },
   status_program: {
-    request: () => new Promise(resolve => loadStatusList('program').then((statusList) => {
+    request: () => new Promise(resolve => statusApi.loadByProject('program').then((statusList) => {
       resolve(statusList);
     })),
     render: status => (
@@ -133,7 +134,7 @@ export default {
     props: {
       filterOption,
     },
-    request: loadEpics,
+    request: () => epicApi.loadEpicsForSelect(),
     render: epic => (
       <Option
         key={epic.issueId}
@@ -152,7 +153,7 @@ export default {
             input.toLowerCase(),
           ) >= 0,
     },
-    request: loadProgramEpics,
+    request: epicApi.loadProgramEpics,
     render: epic => (
       <Option
         key={epic.issueId}
@@ -176,7 +177,7 @@ export default {
     ),
   },
   issue_type: {
-    request: () => loadIssueTypes('agile'),
+    request: () => issueTypeApi.loadAllWithStateMachineId('agile'),
     render: issueType => (
       <Option
         key={issueType.id}
@@ -189,7 +190,7 @@ export default {
   },
   issue_type_program_feature_epic: {
     ...issue_type_program,
-    request: () => new Promise(resolve => loadIssueTypes('program').then((issueTypes) => {
+    request: () => new Promise(resolve => issueTypeApi.loadAllWithStateMachineId('program').then((issueTypes) => {
       const featureTypes = [{
         id: 'business',
         name: '特性',
@@ -217,7 +218,7 @@ export default {
       filterOption: false,
       loadWhenMount: true,
     },
-    request: () => new Promise(resolve => IssueLinkType.queryAll().then((res) => { resolve(transform(res.list)); })),
+    request: () => issueLinkTypeApi.getAll().then(res => transform(res.list)),
     render: link => (
       <Option value={`${link.linkTypeId}+${link.isIn}`}>
         {link.name}
@@ -230,7 +231,7 @@ export default {
       optionLabelProp: 'showName',
       getPopupContainer: triggerNode => triggerNode.parentNode,
     },
-    request: ({ filter, page }, issueId) => loadIssuesInLink(page, 20, issueId, filter),
+    request: ({ filter, page }, issueId) => issueApi.loadIssuesInLink(page, 20, issueId, filter),
     render: issue => (
       <Option
         key={issue.issueId}
@@ -255,12 +256,59 @@ export default {
             {issue.issueNum}
           </span>
           <div style={{ overflow: 'hidden', flex: 1 }}>
-            <p style={{
-              paddingRight: '25px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 0, maxWidth: 'unset',
-            }}
-            >
-              {issue.summary}
-            </p>
+            <Tooltip title={issue.summary}>
+              <p style={{
+                paddingRight: '25px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 0, maxWidth: 'unset',
+              }}
+              >
+                {issue.summary}
+              </p>
+            </Tooltip>
+
+          </div>
+        </div>
+      </Option>
+    ),
+  },
+  features_in_link: {
+    props: {
+      mode: 'multiple',
+      optionLabelProp: 'showName',
+      getPopupContainer: triggerNode => triggerNode.parentNode,
+    },
+    request: ({ filter, page }, issueId) => featureApi.loadFeaturesInLink(page, 20, issueId, filter),
+    render: issue => (
+      <Option
+        key={issue.featureId}
+        value={issue.featureId}
+        showName={issue.issueNum}
+      >
+        <div style={{
+          display: 'inline-flex',
+          flex: 1,
+          width: 'calc(100% - 30px)',
+          alignItems: 'center',
+          verticalAlign: 'middle',
+        }}
+        >
+          <TypeTag
+            data={issue.issueTypeVO}
+          />
+          <span style={{
+            paddingLeft: 12, paddingRight: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}
+          >
+            {issue.issueNum}
+          </span>
+          <div style={{ overflow: 'hidden', flex: 1 }}>
+            <Tooltip title={issue.summary}>
+              <p style={{
+                paddingRight: '25px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 0, maxWidth: 'unset',
+              }}
+              >
+                {issue.summary}
+              </p>
+            </Tooltip>
           </div>
         </div>
       </Option>
@@ -273,7 +321,7 @@ export default {
       filterOption: false,
       loadWhenMount: true,
     },
-    request: loadPriorities,
+    request: () => priorityApi.loadByProject(),
     getDefaultValue: priorities => find(priorities, { default: true }).id,
     render: priority => (
       <Option key={priority.id} value={priority.id}>
@@ -290,7 +338,7 @@ export default {
       filterOption: false,
       loadWhenMount: true,
     },
-    request: ({ filter }) => loadComponents(filter),
+    request: ({ filter }) => componentApi.loadAllComponents(filter),
     render: component => (
       <Option
         key={component.name}
@@ -307,9 +355,23 @@ export default {
       filterOption: false,
       loadWhenMount: true,
     },
-    request: loadLabels,
+    request: () => issueLabelApi.loads(),
     render: label => (
       <Option key={label.labelName} value={label.labelName}>
+        {label.labelName}
+      </Option>
+    ),
+  },
+  label_id: {
+    props: {
+      getPopupContainer: triggerNode => triggerNode.parentNode,
+      filter: true,
+      filterOption,
+      loadWhenMount: true,
+    },
+    request: () => issueLabelApi.loads(),
+    render: label => (
+      <Option key={label.labelId} value={label.labelId}>
         {label.labelName}
       </Option>
     ),
@@ -321,7 +383,7 @@ export default {
       filterOption: false,
       loadWhenMount: true,
     },
-    request: ({ filter, page }, statusList = ['version_planning']) => loadVersions(statusList),
+    request: ({ filter, page }, statusList = ['version_planning']) => versionApi.loadNamesByStatus(statusList),
     render: version => (
       <Option
         key={version.versionId}
@@ -337,11 +399,106 @@ export default {
       filterOption,
       loadWhenMount: true,
     },
-    request: ({ filter, page }, statusList = ['sprint_planning', 'started']) => loadSprints(statusList),
+    request: ({ filter, page }, statusList = ['sprint_planning', 'started']) => sprintApi.loadSprints(statusList),
     render: sprint => (
       <Option key={sprint.sprintId} value={sprint.sprintId}>
         {sprint.sprintName}
       </Option>
+    ),
+  },
+  sprint_in_project: {
+    props: {
+      getPopupContainer: triggerNode => triggerNode.parentNode,
+      filterOption,
+      loadWhenMount: true,
+    },
+    request: ({ filter, page }, { teamId, piId }) => sprintApi.loadSprintsByTeam(teamId, piId),
+    render: sprint => (
+      <Option key={sprint.sprintId} value={sprint.sprintId}>
+        {sprint.sprintName}
+      </Option>
+    ),
+  },
+  pi: {
+    props: {
+      getPopupContainer: triggerNode => triggerNode.parentNode,
+      filterOption,
+      loadWhenMount: true,
+    },
+    request: () => piApi.getUnfinished(),
+    render: pi => (
+      <Option disabled={!IsInProgramStore.isOwner && pi.statusCode === 'doing'} key={pi.id} value={pi.id}>
+        {`${pi.code}-${pi.name}`}
+      </Option>
+    ),
+  },
+  all_pi: {
+    props: {
+      getPopupContainer: triggerNode => triggerNode.parentNode,
+      filterOption,
+      onFilterChange: false,
+      loadWhenMount: true,
+      label: 'PI',
+    },
+    request: () => piApi.getPiListByStatus(),
+    render: pi => (
+      <Option disabled={!IsInProgramStore.isOwner && pi.statusCode === 'doing'} key={pi.id} value={pi.id}>
+        {pi.code ? `${pi.code}-${pi.name}` : pi.name}
+      </Option>
+    ),
+  },
+  feature: {
+    request: ({ filter, page }, requestArgs) => featureApi.getByEpicId(undefined, filter, page),
+    render: item => (
+      <Option key={`${item.issueId}`} value={item.issueId}>{item.summary}</Option>
+    ),
+    props: {
+      getPopupContainer: triggerNode => triggerNode.parentNode,
+      filterOption,
+      loadWhenMount: true,
+    },
+  }, // 特性列表
+  feature_all: {
+    request: ({ filter, page }, requestArgs) => featureApi.queryAllInSubProject(requestArgs, filter, page),
+    render: item => (
+      <Option key={`${item.issueId}`} value={item.issueId}>{item.summary}</Option>
+    ),
+    props: {
+      getPopupContainer: triggerNode => triggerNode.parentNode,
+      filterOption,
+      loadWhenMount: true,
+    },
+  }, // 特性列表
+  sub_project: {
+    props: {
+      getPopupContainer: triggerNode => triggerNode.parentNode,
+      filterOption: filterOptionByName,
+      onFilterChange: false,
+      loadWhenMount: true,
+    },
+    request: () => commonApi.getSubProjects(true),
+    render: pro => (
+      <Option key={pro.projectId} value={pro.projectId} name={pro.projName}>
+        <Tooltip title={pro.projName}>{pro.projName}</Tooltip>
+      </Option>
+    ),
+  },
+  sub_sprint: {
+    props: {
+      getPopupContainer: triggerNode => triggerNode.parentNode,
+      filterOption,
+      onFilterChange: false,
+      loadWhenMount: true,
+    },
+    request: ({ filter, page }, { piId, teamIds }) => sprintApi.getTeamSprints(piId, teamIds),
+    render: team => (
+      <OptGroup label={team.projectVO.name} key={team.projectVO.id}>
+        {(team.sprints || []).map(sprint => (
+          <Option key={`${sprint.sprintId}`} value={sprint.sprintId}>
+            <Tooltip placement="topRight" title={sprint.sprintName}>{sprint.sprintName}</Tooltip>
+          </Option>
+        ))}
+      </OptGroup>
     ),
   },
 };

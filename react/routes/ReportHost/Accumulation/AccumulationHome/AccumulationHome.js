@@ -3,7 +3,7 @@
 import React, { Component } from 'react';
 import { observer } from 'mobx-react';
 import {
-  Button, Icon, DatePicker, Popover, Form, Select, Checkbox, Spin,
+  Button, Icon, DatePicker, Popover, Form, Checkbox, Spin,
 } from 'choerodon-ui';
 import {
   Page, Header, Content, stores, Breadcrumb,
@@ -11,6 +11,9 @@ import {
 import _ from 'lodash';
 import moment from 'moment';
 import ReactEcharts from 'echarts-for-react';
+import {
+  quickFilterApi, reportApi, projectApi, boardApi, 
+} from '@/api';
 import ScrumBoardStore from '../../../../stores/project/scrumBoard/ScrumBoardStore';
 import AccumulationStore from '../../../../stores/project/accumulation/AccumulationStore';
 import AccumulationFilter from '../AccumulationComponent/AccumulationFilter';
@@ -22,8 +25,7 @@ import SwithChart from '../../Component/switchChart';
 
 const { AppState } = stores;
 const { RangePicker } = DatePicker;
-const { Option } = Select;
-let backUrl;
+
 
 @observer
 class AccumulationHome extends Component {
@@ -44,13 +46,13 @@ class AccumulationHome extends Component {
       linkFromParamUrl,
     });
 
-    AccumulationStore.axiosGetFilterList().then((data) => {
+    quickFilterApi.loadAll().then((data) => {
       const newData = _.clone(data);
       for (let index = 0, len = newData.length; index < len; index += 1) {
         newData[index].check = false;
       }
       AccumulationStore.setFilterList(newData);
-      ScrumBoardStore.axiosGetBoardList().then((res) => {
+      boardApi.loadAll().then((res) => {
         const newData2 = _.clone(res);
         let newIndex;
         for (let index = 0, len = newData2.length; index < len; index += 1) {
@@ -89,12 +91,7 @@ class AccumulationHome extends Component {
   }
 
   getColumnData(id, type) {
-    ScrumBoardStore.axiosGetBoardData(id, {
-      onlyMe: false,
-      onlyStory: false,
-      quickSearchArray: [],
-      assigneeFilterIds: [],
-    }).then((res2) => {
+    ScrumBoardStore.axiosGetBoardData(id).then((res2) => {
       const data2 = res2.columnsData.columns;
       for (let index = 0, len = data2.length; index < len; index += 1) {
         data2[index].check = true;
@@ -104,7 +101,7 @@ class AccumulationHome extends Component {
         sprintData: res2.currentSprint,
       });
       AccumulationStore.setColumnData(data2);
-      AccumulationStore.axiosGetProjectInfo().then((res) => {
+      projectApi.loadInfo().then((res) => {
         AccumulationStore.setProjectInfo(res);
         AccumulationStore.setStartDate(moment().subtract(2, 'months'));
         AccumulationStore.setEndDate(moment());
@@ -146,7 +143,7 @@ class AccumulationHome extends Component {
         quickFilterIds.push(filterList[index3].filterId);
       }
     }
-    AccumulationStore.axiosGetAccumulationData({
+    reportApi.loadCumulativeData({
       columnIds,
       endDate,
       quickFilterIds,
@@ -443,7 +440,7 @@ class AccumulationHome extends Component {
     }
     if (!AccumulationStore.getAccumulationData.length) {
       return (
-        <NoDataComponent title="问题" links={[{ name: '问题管理', link: '/agile/issue' }]} img={pic} />
+        <NoDataComponent title="问题" links={[{ name: '问题管理', link: '/agile/work-list/issue' }]} img={pic} />
       );
     }
     return (
@@ -466,7 +463,7 @@ class AccumulationHome extends Component {
     const { linkFromParamUrl } = this.state;
     const urlParams = AppState.currentMenuType;
     return (
-      <Page>
+      <Page service={['choerodon.code.project.operation.chart.ps.choerodon.code.project.operation.chart.ps.cumulative_flow_diagram']}>
         <Header
           title="累积流量图"
           // backPath={`/agile/${linkFromParamUrl || 'reporthost'}?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}`}
@@ -483,9 +480,6 @@ class AccumulationHome extends Component {
         </Header>
         <Breadcrumb title="累积流量图" />
         <Content
-          // title="累积流量图"
-          // description="显示状态的问题。这有助于您识别潜在的瓶颈, 需要对此进行调查。"
-          // link="https://v0-16.choerodon.io/zh/docs/user-guide/report/agile-report/cumulative-flow/"
           style={{
             display: 'flex',
             flexDirection: 'column',

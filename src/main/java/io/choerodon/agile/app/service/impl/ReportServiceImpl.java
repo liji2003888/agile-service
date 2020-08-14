@@ -1,8 +1,7 @@
 package io.choerodon.agile.app.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
-import com.github.pagehelper.PageHelper;
-import com.github.pagehelper.PageInfo;
+import io.choerodon.core.domain.Page;
 import io.choerodon.agile.api.vo.*;
 import io.choerodon.agile.app.assembler.IssueAssembler;
 import io.choerodon.agile.app.assembler.ReportAssembler;
@@ -12,21 +11,20 @@ import io.choerodon.agile.infra.enums.SchemeApplyType;
 import io.choerodon.agile.infra.mapper.*;
 import io.choerodon.agile.infra.utils.ConvertUtil;
 import io.choerodon.agile.infra.utils.PageUtil;
-import io.choerodon.web.util.PageableHelper;
-import org.springframework.data.domain.Pageable;
+import io.choerodon.mybatis.pagehelper.PageHelper;
+import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 import io.choerodon.core.exception.CommonException;
+import io.choerodon.mybatis.pagehelper.domain.Sort;
+import org.apache.commons.lang3.StringUtils;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
-import org.modelmapper.convention.MatchingStrategies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.PostConstruct;
 import java.math.BigDecimal;
 import java.text.DateFormat;
 import java.text.ParseException;
@@ -76,9 +74,10 @@ public class ReportServiceImpl implements ReportService {
     @Autowired
     private StatusService statusService;
 
-    private static final String STORY_POINTS = "storyPoints";
-    private static final String REMAINING_ESTIMATED_TIME = "remainingEstimatedTime";
-    private static final String ISSUE_COUNT = "issueCount";
+    public static final String STORY_POINTS = "storyPoints";
+    public static final String REMAINING_ESTIMATED_TIME = "remainingEstimatedTime";
+    public static final String ISSUE_COUNT = "issueCount";
+    public static final String COORDINATE = "coordinate";
     private static final String SPRINT_PLANNING_CODE = "sprint_planning";
     private static final String REPORT_SPRINT_ERROR = "error.report.sprintError";
     private static final String REPORT_FILTER_ERROR = "error.cumulativeFlowDiagram.filter";
@@ -114,13 +113,8 @@ public class ReportServiceImpl implements ReportService {
     private static final ExecutorService pool = Executors.newFixedThreadPool(3);
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ReportServiceImpl.class);
-
-    private ModelMapper modelMapper = new ModelMapper();
-
-    @PostConstruct
-    public void init() {
-        modelMapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
-    }
+    @Autowired
+    private ModelMapper modelMapper;
 
     @Override
     public void setReportMapper(ReportMapper reportMapper) {
@@ -259,7 +253,7 @@ public class ReportServiceImpl implements ReportService {
                 }
             }
         });
-        jsonObject.put("coordinate", report);
+        jsonObject.put(ReportServiceImpl.COORDINATE, report);
         //需要返回给前端期望值（开启冲刺的和）
         jsonObject.put("expectCount", handleExpectCount(reportIssueConvertDTOList));
         return jsonObject;
@@ -369,14 +363,14 @@ public class ReportServiceImpl implements ReportService {
             changeDto.setColumnTo(columnTo == null ? "0" : columnTo + "");
             changeDto.setColumnFrom(columnFrom == null ? "0" : columnFrom + "");
         });
-        changeIssueDuringDate = changeIssueDuringDate.stream().filter(x -> x.getColumnFrom() != x.getColumnTo()).collect(Collectors.toList());
+        changeIssueDuringDate = changeIssueDuringDate.stream().filter(x -> !x.getColumnFrom().equals(x.getColumnTo())).collect(Collectors.toList());
         if (changeIssueDuringDate != null && !changeIssueDuringDate.isEmpty()) {
             result.addAll(changeIssueDuringDate);
         }
     }
 
     @Override
-    public PageInfo<IssueListVO> queryIssueByOptions(Long projectId, Long versionId, String status, String type, Pageable pageable, Long organizationId) {
+    public Page<IssueListVO> queryIssueByOptions(Long projectId, Long versionId, String status, String type, PageRequest pageRequest, Long organizationId) {
         ProductVersionDTO versionDO = new ProductVersionDTO();
         versionDO.setProjectId(projectId);
         versionDO.setVersionId(versionId);
@@ -384,15 +378,14 @@ public class ReportServiceImpl implements ReportService {
         if (versionDO == null || Objects.equals(versionDO.getStatusCode(), VERSION_ARCHIVED_CODE)) {
             throw new CommonException(VERSION_REPORT_ERROR);
         }
-        Sort sort = PageUtil.sortResetOrder(pageable.getSort(), "ai", new HashMap<>());
+        Sort sort = PageUtil.sortResetOrder(pageRequest.getSort(), "ai", new HashMap<>());
         //pageable.resetOrder("ai", new HashMap<>());
-        PageInfo<IssueDTO> reportIssuePage = PageHelper.startPage(pageable.getPageNumber(), pageable.getPageSize(),
-                PageableHelper.getSortSql(sort)).doSelectPageInfo(() -> reportMapper.
+        Page<IssueDTO> reportIssuePage = PageHelper.doPageAndSort(pageRequest, () -> reportMapper.
                 queryReportIssues(projectId, versionId, status, type));
         Map<Long, PriorityVO> priorityMap = priorityService.queryByOrganizationId(organizationId);
         Map<Long, IssueTypeVO> issueTypeDTOMap = issueTypeService.listIssueTypeMap(organizationId);
         Map<Long, StatusVO> statusMapDTOMap = statusService.queryAllStatusMap(organizationId);
-        return PageUtil.buildPageInfoWithPageInfoList(reportIssuePage, issueAssembler.issueDoToIssueListDto(reportIssuePage.getList(), priorityMap, statusMapDTOMap, issueTypeDTOMap));
+        return PageUtil.buildPageInfoWithPageInfoList(reportIssuePage, issueAssembler.issueDoToIssueListDto(reportIssuePage.getContent(), priorityMap, statusMapDTOMap, issueTypeDTOMap));
     }
 
     @Override
@@ -1387,6 +1380,77 @@ public class ReportServiceImpl implements ReportService {
         List<ReportIssueConvertDTO> reportIssueConvertDTOList = getBurnDownReport(projectId, sprintId, type);
         return handleSameDay(reportIssueConvertDTOList.stream().filter(reportIssueConvertDTO -> !"endSprint".equals(reportIssueConvertDTO.getType())).
                 sorted(Comparator.comparing(ReportIssueConvertDTO::getDate)).collect(Collectors.toList()));
+    }
+
+    @Override
+    public IssueCountVO selectBugBysprint(Long projectId, Long sprintId) {
+        List<ReportIssueConvertDTO> reportIssueConvertDTOList = queryBugCount(projectId, sprintId);
+        IssueCountVO issueCount = new IssueCountVO();
+        DateFormat bf = new SimpleDateFormat("yyyy-MM-dd");
+        // 新增bug统计
+        issueCount.setCreatedList(issueAssembler.convertBugEntry(reportIssueConvertDTOList, bf,
+                bug -> StringUtils.equals(bug.getType(), "startSprint")
+                        || bug.getStatistical() && StringUtils.equalsAny(bug.getType(),
+                 "endSprint", "addDuringSprint")));
+        // 解决bug统计
+        issueCount.setCompletedList(issueAssembler.convertBugEntry(reportIssueConvertDTOList, bf, bug -> {
+            if (Objects.equals(bug.getType(), "startSprint") && !bug.getStatistical()) {
+                return true;
+            } else if (Objects.equals(bug.getType(), "endSprint") && !bug.getStatistical()) {
+                bug.setNewValue(BigDecimal.ONE);
+                bug.setOldValue(BigDecimal.ZERO);
+                return true;
+            } else if (StringUtils.equals(bug.getType(), "addDoneDuringSprint") && bug.getStatistical()) {
+                bug.setNewValue(BigDecimal.ONE);
+                bug.setOldValue(BigDecimal.ZERO);
+                return true;
+            } else {
+                return false;
+            }
+        }));
+        return issueCount;
+    }
+
+    private List<ReportIssueConvertDTO> queryBugCount(Long projectId, Long sprintId) {
+        List<ReportIssueConvertDTO> reportIssueConvertDTOList = new ArrayList<>();
+        SprintDTO query = new SprintDTO();
+        query.setSprintId(sprintId);
+        query.setProjectId(projectId);
+        SprintDTO sprintDTO = sprintMapper.selectOne(query);
+        if (Objects.isNull(sprintDTO.getActualEndDate())){
+            sprintDTO.setActualEndDate(new Date());
+        }
+        //获取冲刺开启前的issue
+        List<Long> issueIdBeforeSprintList;
+        //获取当前冲刺期间加入的issue
+        List<Long> issueIdAddList;
+        //获取当前冲刺期间移除的issue
+        List<Long> issueIdRemoveList;
+        //异步任务
+        CompletableFuture<List<Long>> task1 = CompletableFuture
+                .supplyAsync(() -> reportMapper.queryBugIdsBeforeSprintStart(sprintDTO), pool);
+        CompletableFuture<List<Long>> task2 = CompletableFuture
+                .supplyAsync(() -> reportMapper.queryAddBugIdsDuringSprint(sprintDTO), pool);
+        CompletableFuture<List<Long>> task3 = CompletableFuture
+                .supplyAsync(() -> reportMapper.queryRemoveBugIdsDuringSprint(sprintDTO), pool);
+        issueIdBeforeSprintList = task1.join();
+        issueIdAddList = task2.join();
+        issueIdRemoveList = task3.join();
+        //获取冲刺开启前的bug统计
+        handleIssueCountBeforeSprint(sprintDTO, reportIssueConvertDTOList, issueIdBeforeSprintList);
+        //获取当前冲刺期间加入的bug
+        handleAddIssueCountDuringSprint(sprintDTO, reportIssueConvertDTOList, issueIdAddList);
+        //获取当前冲刺期间移除的bug
+        handleRemoveCountDuringSprint(sprintDTO, reportIssueConvertDTOList, issueIdRemoveList);
+        //获取冲刺结束时的bug
+        handleIssueCountAfterSprint(sprintDTO, reportIssueConvertDTOList);
+        //获取冲刺期间所有操作到的bug
+        List<Long> issueAllList = getAllIssueDuringSprint(issueIdBeforeSprintList, issueIdAddList, issueIdRemoveList);
+        //获取当前冲刺期间移动到done状态的bug
+        handleAddDoneIssueCountDuringSprint(sprintDTO, reportIssueConvertDTOList, issueAllList);
+        //获取当前冲刺期间移出done状态的bug
+        handleRemoveDoneIssueCountDuringSprint(sprintDTO, reportIssueConvertDTOList, issueAllList);
+        return reportIssueConvertDTOList;
     }
 
     private BigDecimal calculateStoryPoints(List<IssueBurnDownReportDTO> issueDOS) {

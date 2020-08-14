@@ -1,13 +1,12 @@
 import React, { Component } from 'react';
-import { stores, axios } from '@choerodon/boot';
 import { Spin } from 'choerodon-ui';
+import { priorityApi } from '@/api';
 import PriorityTag from '../../../../components/PriorityTag';
 import EmptyBlockDashboard from '../../../../components/EmptyBlockDashboard';
 import pic from '../EmptyPics/no_sprint.svg';
 import pic2 from '../EmptyPics/no_version.svg';
 import './Priority.less';
 
-const { AppState } = stores;
 
 class Priority extends Component {
   constructor(props) {
@@ -19,15 +18,12 @@ class Priority extends Component {
     };
   }
 
-  componentWillReceiveProps(nextProps) {
+  componentDidMount() {
     const { sprintId } = this.props;
-    if (nextProps.sprintId !== sprintId) {
-      const newSprintId = nextProps.sprintId;
-      this.setState({
-        sprintId: newSprintId,
-      });
-      this.loadPriorityInfo(newSprintId);
-    }
+    this.setState({
+      sprintId,
+    });
+    this.loadPriorityInfo(sprintId);
   }
 
   loadPriorityInfo(sprintId) {
@@ -38,15 +34,12 @@ class Priority extends Component {
       });
     } else {
       this.setState({ loading: true });
-      const projectId = AppState.currentMenuType.id;
-      const orgId = AppState.currentMenuType.organizationId;
-      axios.get(`/agile/v1/projects/${projectId}/iterative_worktable/priority?organizationId=${orgId}&sprintId=${sprintId}`)
-        .then((res) => {
-          this.setState({
-            priorityInfo: res,
-            loading: false,
-          });
+      priorityApi.getDistribute(sprintId).then((res) => {
+        this.setState({
+          priorityInfo: res,
+          loading: false,
         });
+      });
     }
   }
 

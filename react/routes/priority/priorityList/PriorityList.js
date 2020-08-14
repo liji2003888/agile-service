@@ -1,16 +1,16 @@
 import React, { Component } from 'react';
-import { observer, inject } from 'mobx-react';
-import { withRouter } from 'react-router-dom';
+import { observer } from 'mobx-react';
 import {
-  Table, Button, Modal, Form, Select, Input, Tooltip, Icon, Divider, message, Dropdown, Menu,
+  Table, Button, Modal, Select, Icon, message, Menu,
 } from 'choerodon-ui';
 import { injectIntl, FormattedMessage } from 'react-intl';
 import {
-  Content, Header, TabPage as Page, Permission, stores, axios, Breadcrumb,
+  Content, Header, TabPage as Page, stores, Breadcrumb,
 } from '@choerodon/boot';
 import { DragDropContext } from 'react-dnd';
 import HTML5Backend from 'react-dnd-html5-backend';
 import update from 'immutability-helper';
+import { priorityApi } from '@/api';
 import PriorityCreate from '../priorityCreate';
 import PriorityEdit from '../priorityEdit';
 import BodyRow from './bodyRow';
@@ -68,7 +68,10 @@ class PriorityList extends Component {
 
     PriorityStore.setPriorityList(priorityListAfterDrag);
     // 更新顺序
-    PriorityStore.reOrder(orgId).then(() => {
+    priorityApi.sort(PriorityStore.getPriorityList.map(item => ({
+      id: item.id,
+      sequence: item.sequence,
+    }))).then(() => {
       PriorityStore.loadPriorityList(orgId);
     });
   };
@@ -177,7 +180,7 @@ class PriorityList extends Component {
     const { intl, PriorityStore } = this.props;
     const orgId = AppState.currentMenuType.organizationId;
     const that = this;
-    const count = await PriorityStore.checkDelete(orgId, priority.id);
+    const count = await priorityApi.checkBeforeDel(priority.id);
     const priorityList = PriorityStore.getPriorityList.filter(item => item.id !== priority.id);
     confirm({
       title: intl.formatMessage({ id: 'priority.delete.title' }),
@@ -248,7 +251,7 @@ class PriorityList extends Component {
     const { priorityId } = this.state;
     const orgId = AppState.currentMenuType.organizationId;
     try {
-      await PriorityStore.deletePriorityById(orgId, id, priorityId || defaultId);
+      await priorityApi.delete(id, priorityId || defaultId);
       PriorityStore.loadPriorityList(orgId);
     } catch (err) {
       message.error('删除失败');
@@ -287,7 +290,7 @@ class PriorityList extends Component {
     const { PriorityStore } = this.props;
     const orgId = AppState.currentMenuType.organizationId;
     try {
-      await PriorityStore.enablePriority(orgId, priority.id, !priority.enable);
+      await priorityApi.updateStatus(priority.id, !priority.enable);
       PriorityStore.loadPriorityList(orgId);
     } catch (err) {
       message.error('修改状态失败');
@@ -318,7 +321,7 @@ class PriorityList extends Component {
   }
 
   render() {
-    const { PriorityStore, intl } = this.props;
+    const { PriorityStore } = this.props;
     const {
       getPriorityList,
       onLoadingList,
@@ -327,12 +330,10 @@ class PriorityList extends Component {
     } = PriorityStore;
 
     return (
-      <Page 
+      <Page
         className="c7nagile-priority"
         service={[
-          'agile-service.priority.selectAll',
-          'agile-service.priority.checkName',
-          'agile-service.priority.create',
+          'choerodon.code.organization.setting.issue.priority.ps.default',
         ]}
       >
         <Header title={<FormattedMessage id="priority.title" />}>
@@ -340,16 +341,8 @@ class PriorityList extends Component {
             <Icon type="playlist_add" />
             <FormattedMessage id="priority.create" />
           </Button>
-          {/* <Button onClick={this.refresh}>
-            <Icon type="refresh" />
-            <FormattedMessage id="refresh" />
-          </Button> */}
         </Header>
-        <Breadcrumb title="" />
-        {/* <Content
-          description={intl.formatMessage({ id: 'priority.list.tip' })}
-          link="https://choerodon.io/zh/docs/user-guide/system-configuration/issue-configuration/issue-properties/issue-priority/"
-        > */}
+        <Breadcrumb />
         <Content>
           <Table
             filterBarPlaceholder="过滤表"

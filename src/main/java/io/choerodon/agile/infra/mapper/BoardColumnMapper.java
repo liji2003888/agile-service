@@ -1,9 +1,10 @@
 package io.choerodon.agile.infra.mapper;
 
 import io.choerodon.agile.api.vo.ColumnWithMaxMinNumVO;
+import io.choerodon.agile.api.vo.SearchVO;
 import io.choerodon.agile.api.vo.event.RemoveStatusWithProject;
 import io.choerodon.agile.infra.dto.*;
-import io.choerodon.mybatis.common.Mapper;
+import io.choerodon.mybatis.common.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -12,15 +13,17 @@ import java.util.List;
  * Created by HuangFuqiang@choerodon.io on 2018/5/14.
  * Email: fuqianghuang01@gmail.com
  */
-public interface BoardColumnMapper extends Mapper<BoardColumnDTO> {
+public interface BoardColumnMapper extends BaseMapper<BoardColumnDTO> {
 
-    List selectColumnsByBoardId(@Param("projectId") Long projectId,
+    List<ColumnAndIssueDTO> selectColumnsByBoardId(@Param("projectId") Long projectId,
                                 @Param("boardId") Long boardId,
-                                @Param("activeSprintId") Long activeSprintId,
+                                @Param("sprintId") Long sprintId,
                                 @Param("assigneeId") Long assigneeId,
                                 @Param("onlyStory") Boolean onlyStory,
                                 @Param("filterSql") String filterSql,
-                                @Param("assigneeFilterIds") List<Long> assigneeFilterIds);
+                                @Param("assigneeFilterIds") List<Long> assigneeFilterIds,
+                                @Param("searchList") List<SearchVO> searchList,
+                                @Param("priorityIds") List<Long> priorityIds);
 
     void columnSort(@Param("boardId") Long boardId,
                     @Param("sequence") Integer sequence,
@@ -37,14 +40,6 @@ public interface BoardColumnMapper extends Mapper<BoardColumnDTO> {
                            @Param("columnNum") Integer columnNum);
 
     List queryColumnStatusRelByProjectId(@Param("projectId") Long projectId);
-
-//    BoardColumnCheckDTO selectColumnByColumnId(@Param("projectId") Long projectId,
-//                                              @Param("columnId") Long columnId,
-//                                              @Param("activeSprintId") Long activeSprintId);
-
-//    BoardColumnCheckDTO selectColumnByColumnIdWithoutSub(@Param("projectId") Long projectId,
-//                                                        @Param("columnId") Long columnId,
-//                                                        @Param("activeSprintId") Long activeSprintId);
 
     void updateMaxAndMinNum(@Param("columnInfo") ColumnWithMaxMinNumVO columnWithMaxMinNumVO);
 
@@ -93,13 +88,8 @@ public interface BoardColumnMapper extends Mapper<BoardColumnDTO> {
 
     List<ColumnIssueNumDTO> getAllColumnNum(@Param("projectId") Long projectId,
                                             @Param("boardId") Long boardId,
-                                            @Param("activeSprintId") Long activeSprintId,
+                                            @Param("sprintId") Long sprintId,
                                             @Param("columnConstraint") String columnConstraint);
-
-//    List<ColumnAndIssueDTO> selectBoardByProgram(@Param("projectId") Long projectId,
-//                                                 @Param("boardId") Long boardId,
-//                                                 @Param("activePiId") Long activePiId,
-//                                                 @Param("searchVO")SearchVO searchVO);
 
     List<BoardColumnStatusRelDTO> queryRelByColumnIds(@Param("columnIds") List<Long> columnIds);
 }

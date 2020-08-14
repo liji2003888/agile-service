@@ -3,12 +3,14 @@ package io.choerodon.agile.api.controller.v1;
 import io.choerodon.agile.api.vo.*;
 import io.choerodon.agile.app.service.QuickFilterFieldService;
 import io.choerodon.agile.app.service.QuickFilterService;
-import io.choerodon.core.annotation.Permission;
-import io.choerodon.core.enums.ResourceType;
+import io.choerodon.core.iam.ResourceLevel;
+import io.choerodon.swagger.annotation.Permission;
 import io.choerodon.core.exception.CommonException;
 import io.choerodon.core.iam.InitRoleCode;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import org.hzero.starter.keyencrypt.core.Encrypt;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,7 +35,7 @@ public class QuickFilterController {
 
     private static final String DRAG_ERROR = "error.filter.dragVersion";
 
-    @Permission(type = ResourceType.PROJECT, roles = InitRoleCode.PROJECT_OWNER)
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("创建quick filter")
     @PostMapping
     public ResponseEntity<QuickFilterVO> create(@ApiParam(value = "项目id", required = true)
@@ -45,13 +47,13 @@ public class QuickFilterController {
                 .orElseThrow(() -> new CommonException("error.quickFilter.create"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("修改quick filter")
     @PutMapping(value = "/{filterId}")
     public ResponseEntity<QuickFilterVO> update(@ApiParam(value = "项目id", required = true)
                                                  @PathVariable(name = "project_id") Long projectId,
                                                 @ApiParam(value = "filter id", required = true)
-                                                 @PathVariable Long filterId,
+                                                 @PathVariable @Encrypt Long filterId,
                                                 @ApiParam(value = "quick filter object", required = true)
                                                  @RequestBody QuickFilterVO quickFilterVO) {
         return Optional.ofNullable(quickFilterService.update(projectId, filterId, quickFilterVO))
@@ -59,30 +61,30 @@ public class QuickFilterController {
                 .orElseThrow(() -> new CommonException("error.quickFilter.update"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("删除quick filter")
     @DeleteMapping(value = "/{filterId}")
     public ResponseEntity<QuickFilterVO> deleteById(@ApiParam(value = "项目id", required = true)
                                                      @PathVariable(name = "project_id") Long projectId,
                                                     @ApiParam(value = "filter id", required = true)
-                                                     @PathVariable Long filterId) {
+                                                     @PathVariable @Encrypt Long filterId) {
         quickFilterService.deleteById(projectId, filterId);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("根据id查询quick filter")
     @GetMapping(value = "/{filterId}")
     public ResponseEntity<QuickFilterVO> queryById(@ApiParam(value = "项目id", required = true)
                                                     @PathVariable(name = "project_id") Long projectId,
                                                    @ApiParam(value = "filter id", required = true)
-                                                    @PathVariable Long filterId) {
+                                                    @PathVariable @Encrypt Long filterId) {
         return Optional.ofNullable(quickFilterService.queryById(projectId, filterId))
                 .map(result -> new ResponseEntity<>(result, HttpStatus.OK))
                 .orElseThrow(() -> new CommonException("error.quickFilter.get"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("查询quick filter列表")
     @PostMapping(value = "/query_all")
     public ResponseEntity<List<QuickFilterVO>> listByProjectId(@ApiParam(value = "项目id", required = true)
@@ -94,7 +96,7 @@ public class QuickFilterController {
     }
 
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("查询quick filter field列表")
     @GetMapping("/fields")
     public ResponseEntity<List<QuickFilterFieldVO>> list(@ApiParam(value = "项目id", required = true)
@@ -104,19 +106,19 @@ public class QuickFilterController {
                 .orElseThrow(() -> new CommonException("error.quickFilterField.list"));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation(value = "拖动过滤位置")
     @PutMapping(value = "/drag")
     public ResponseEntity<QuickFilterVO> dragFilter(@ApiParam(value = "项目id", required = true)
                                                      @PathVariable(name = "project_id") Long projectId,
                                                     @ApiParam(value = "排序对象", required = true)
-                                                     @RequestBody QuickFilterSequenceVO quickFilterSequenceVO) {
+                                                     @RequestBody @Encrypt QuickFilterSequenceVO quickFilterSequenceVO) {
         return Optional.ofNullable(quickFilterService.dragFilter(projectId, quickFilterSequenceVO))
                 .map(result -> new ResponseEntity<>(result, HttpStatus.CREATED))
                 .orElseThrow(() -> new CommonException(DRAG_ERROR));
     }
 
-    @Permission(type = ResourceType.PROJECT, roles = {InitRoleCode.PROJECT_MEMBER, InitRoleCode.PROJECT_OWNER})
+    @Permission(level = ResourceLevel.ORGANIZATION)
     @ApiOperation("快速搜索重名校验")
     @GetMapping("/check_name")
     public ResponseEntity<Boolean> checkName(@ApiParam(value = "项目id", required = true)

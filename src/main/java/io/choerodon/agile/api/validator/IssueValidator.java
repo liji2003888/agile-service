@@ -1,20 +1,19 @@
 package io.choerodon.agile.api.validator;
 
+import java.util.Objects;
+
 import com.alibaba.fastjson.JSONObject;
 import io.choerodon.agile.api.vo.*;
 import io.choerodon.agile.app.service.IssueService;
 import io.choerodon.agile.app.service.ProjectConfigService;
-import io.choerodon.agile.infra.dto.IssueConvertDTO;
-import io.choerodon.agile.infra.enums.SchemeApplyType;
-import io.choerodon.agile.infra.utils.EnumUtil;
 import io.choerodon.agile.infra.dto.*;
+import io.choerodon.agile.infra.enums.SchemeApplyType;
 import io.choerodon.agile.infra.mapper.*;
+import io.choerodon.agile.infra.utils.EncryptionUtils;
+import io.choerodon.agile.infra.utils.EnumUtil;
 import io.choerodon.core.exception.CommonException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
-import java.util.Objects;
 
 /**
  * Created by HuangFuqiang@choerodon.io on 2018/8/9.
@@ -97,8 +96,9 @@ public class IssueValidator {
         if (issueUpdate.get(ISSUE_ID) == null) {
             throw new CommonException(ERROR_ISSUE_ID_NOT_FOUND);
         }
+        Long issueId = EncryptionUtils.decrypt(issueUpdate.get(ISSUE_ID).toString(), EncryptionUtils.BLANK_KEY);
         IssueDTO issueDTO = new IssueDTO();
-        issueDTO.setIssueId(Long.parseLong(issueUpdate.get(ISSUE_ID).toString()));
+        issueDTO.setIssueId(issueId);
         issueDTO.setProjectId(projectId);
         issueDTO = issueMapper.selectByPrimaryKey(issueDTO);
         if (issueDTO == null) {
@@ -113,7 +113,7 @@ public class IssueValidator {
             throw new CommonException("error.IssueRule.EpicName");
         }
         //修改状态要有当前状态
-        if (issueUpdate.get(STATUS_ID) != null && issueStatusMapper.selectByPrimaryKey(Long.parseLong(issueUpdate.get(STATUS_ID).toString())) == null) {
+        if (issueUpdate.get(STATUS_ID) != null && issueStatusMapper.selectByPrimaryKey(EncryptionUtils.decrypt(issueUpdate.get(STATUS_ID).toString(), EncryptionUtils.BLANK_KEY)) == null) {
             throw new CommonException("error.IssueRule.statusId");
         }
 
@@ -298,23 +298,24 @@ public class IssueValidator {
     }
 
 
-    public void checkIssueIdsAndVersionId(Long projectId, List<Long> issueIds, Long versionId) {
-        if (issueIds.isEmpty()) {
-            throw new CommonException("error.issueValidator.issueIdsNull");
-        }
-        ProductVersionDTO productVersionDTO = new ProductVersionDTO();
-        productVersionDTO.setProjectId(projectId);
-        productVersionDTO.setVersionId(versionId);
-        if (productVersionMapper.selectByPrimaryKey(productVersionDTO) == null) {
-            throw new CommonException("error.issueValidator.versionNotFound");
-        }
-    }
+//    public void checkIssueIdsAndVersionId(Long projectId, List<Long> issueIds, Long versionId) {
+//        if (issueIds.isEmpty()) {
+//            throw new CommonException("error.issueValidator.issueIdsNull");
+//        }
+//        ProductVersionDTO productVersionDTO = new ProductVersionDTO();
+//        productVersionDTO.setProjectId(projectId);
+//        productVersionDTO.setVersionId(versionId);
+//        if (productVersionMapper.selectByPrimaryKey(productVersionDTO) == null) {
+//            throw new CommonException("error.issueValidator.versionNotFound");
+//        }
+//    }
 
     public void checkIssueCreate(IssueCreateVO issueCreateVO, String applyType) {
         if (!EnumUtil.contain(SchemeApplyType.class, applyType)) {
             throw new CommonException("error.applyType.illegal");
         }
-        if (SchemeApplyType.AGILE.equals(applyType) && issueCreateVO.getEpicName() != null && issueService.checkEpicName(issueCreateVO.getProjectId(), issueCreateVO.getEpicName())) {
+        if (SchemeApplyType.AGILE.equals(applyType) && issueCreateVO.getEpicName() != null
+                && issueService.checkEpicName(issueCreateVO.getProjectId(), issueCreateVO.getEpicName(), null)) {
             throw new CommonException("error.epicName.exist");
         }
         if (issueCreateVO.getRankVO() != null) {

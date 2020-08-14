@@ -4,33 +4,36 @@ import {
   Page, Header, Content, stores, Breadcrumb, Choerodon, Permission,
 } from '@choerodon/boot';
 import {
-  Button, Select, Spin, Icon, Modal, Input, Form, Tooltip, Radio,
+  Button, Select, Spin, Icon, Modal, Form, Tooltip, Radio,
 } from 'choerodon-ui';
 import { Modal as ModalPro } from 'choerodon-ui/pro';
+import CloseSprint from '@/components/close-sprint';
+import {
+  sprintApi, issueApi, epicApi, issueTypeApi, statusApi, boardApi,
+} from '@/api';
 import ScrumBoardDataController from './ScrumBoardDataController';
 import ScrumBoardStore from '../../../stores/project/scrumBoard/ScrumBoardStore';
 import StatusColumn from '../ScrumBoardComponent/StatusColumn/StatusColumn';
 import './ScrumBoardHome.less';
 import IssueDetail from '../ScrumBoardComponent/IssueDetail/IssueDetail';
-import BacklogStore from '../../../stores/project/backlog/BacklogStore';
-import CloseSprint from '../../Backlog/components/SprintComponent/CloseSprint';
 import QuickSearch, { QuickSearchEvent } from '../../../components/QuickSearch';
 import NoneSprint from '../ScrumBoardComponent/NoneSprint/NoneSprint';
 import '../ScrumBoardComponent/RenderSwimLaneContext/RenderSwimLaneContext.less';
 import SwimLane from '../ScrumBoardComponent/RenderSwimLaneContext/SwimLane';
 import CSSBlackMagic from '../../../components/CSSBlackMagic/CSSBlackMagic';
-import HaederLine from '../../../common/Headerline';
+import HeaderLine from '../../../components/HeaderLine';
+import ScrumBoardFullScreen from '../ScrumBoardComponent/ScrumBoardFullScreen';
 import CreateBoard from '../ScrumBoardComponent/CreateBoard';
+import { service } from '../setting/Setting';
+import SelectPriority from './SelectPriority';
 
 const { Option } = Select;
-const { Sidebar } = Modal;
-const FormItem = Form.Item;
 const { AppState } = stores;
 
 const RadioGroup = Radio.Group;
 const RadioButton = Radio.Button;
 
-const style = swimLaneId => `
+const style = (swimLaneId) => `
   .${swimLaneId}.c7n-swimlaneContext-itemBodyColumn {
     background-color: rgba(140, 158, 255, 0.12) !important;
   }
@@ -44,6 +47,7 @@ const style = swimLaneId => `
   } 
 `;
 
+@Form.create()
 @CSSBlackMagic
 @inject('AppState', 'HeaderStore')
 @observer
@@ -53,7 +57,6 @@ class ScrumBoardHome extends Component {
     this.dataConverter = new ScrumBoardDataController();
     this.ref = null;
     this.state = {
-      closeSprintVisible: false,
       updateParentStatus: null,
     };
   }
@@ -61,6 +64,11 @@ class ScrumBoardHome extends Component {
   componentDidMount() {
     ScrumBoardStore.setSelectedBoardId('');
     this.getBoard();
+    // eslint-disable-next-line react/destructuring-assignment
+    const { state } = this.props.location;
+    if (state && state.issueId) {
+      ScrumBoardStore.setClickedIssue(state.issueId);
+    }
   }
 
   componentWillUnmount() {
@@ -71,9 +79,9 @@ class ScrumBoardHome extends Component {
   getBoard = async () => {
     const { location } = this.props;
     const url = this.paramConverter(location.search);
-    const boardListData = await ScrumBoardStore.axiosGetBoardList();
+    const boardListData = await boardApi.loadAll();
     ScrumBoardStore.initBoardList(boardListData);
-    const defaultBoard = boardListData.find(item => item.userDefault) || boardListData[0];
+    const defaultBoard = boardListData.find((item) => item.userDefault) || boardListData[0];
     if (defaultBoard.boardId) {
       ScrumBoardStore.setSelectedBoardId(defaultBoard.boardId);
       this.refresh(defaultBoard, url, boardListData);
@@ -93,8 +101,18 @@ class ScrumBoardHome extends Component {
     return retObj;
   };
 
-  onQuickSearchChange = (onlyMeChecked = false, onlyStoryChecked = false, moreChecked) => {
-    ScrumBoardStore.addQuickSearchFilter(onlyMeChecked, onlyStoryChecked, moreChecked);
+  onQuickSearchChange = (
+    onlyMeChecked = false,
+    onlyStoryChecked = false,
+    moreChecked,
+    personalFilters,
+  ) => {
+    ScrumBoardStore.addQuickSearchFilter(
+      onlyMeChecked,
+      onlyStoryChecked,
+      moreChecked,
+      personalFilters,
+    );
     this.refresh(ScrumBoardStore.getBoardList.get(ScrumBoardStore.getSelectedBoard));
   };
 
@@ -102,6 +120,11 @@ class ScrumBoardHome extends Component {
     ScrumBoardStore.addAssigneeFilter(value);
     this.refresh(ScrumBoardStore.getBoardList.get(ScrumBoardStore.getSelectedBoard));
   };
+
+  onSprintChange = (value) => {
+    ScrumBoardStore.addSprintFilter(value);
+    this.refresh(ScrumBoardStore.getBoardList.get(ScrumBoardStore.getSelectedBoard));
+  }
 
   handleClearFilter = () => {
     ScrumBoardStore.clearFilter();
@@ -114,27 +137,33 @@ class ScrumBoardHome extends Component {
    *
    * @memberof ScrumBoardHome
    */
-  handleFinishSprint = () => {
-    BacklogStore.axiosGetSprintCompleteMessage(
-      ScrumBoardStore.getSprintId,
-    ).then((res) => {
-      BacklogStore.setSprintCompleteMessage(res);
-      // this.refresh(ScrumBoardStore.getBoardList.get(ScrumBoardStore.getSelectedBoard));
-      this.setState({
-        closeSprintVisible: true,
-      });
-    }).catch((error) => {
+  handleFinishSprint = async () => {
+    const sprintId = ScrumBoardStore.getSprintId;
+    const completeMessage = await sprintApi.loadSprintAndCountIssue(sprintId);
+    CloseSprint({
+      completeMessage,
+      sprintId,
+      afterClose: async () => {
+        const axiosGetSprintNotClosed = sprintApi.loadSprints(['sprint_planning', 'started']);
+        await axiosGetSprintNotClosed.then((res) => {
+          ScrumBoardStore.setSprintNotClosedArray(res);
+          ScrumBoardStore.setSelectSprint(undefined);
+          ScrumBoardStore.resetCurrentSprintExist();
+          this.onSprintChange(undefined);
+        });
+        this.refresh(ScrumBoardStore.getBoardList.get(ScrumBoardStore.getSelectedBoard));
+      },
     });
   };
 
   changeState = (name, value) => {
     if (name === 'judgeUpdateParent') {
-      ScrumBoardStore.loadTransforms(value.statusId, value.id, value.typeId).then((types) => {
+      statusApi.loadTransformStatusByIssue(value.statusId, value.id, value.typeId).then((types) => {
         this.matchStatus(types);
         this.setState({
           [name]: value,
         });
-      }).catch((e) => {
+      }).catch(() => {
         Choerodon.prompt('查询状态失败，请重试！');
       });
     }
@@ -144,7 +173,7 @@ class ScrumBoardHome extends Component {
     const { headerStyle } = this.props;
     const { draggableId } = result;
     const [SwimLaneId, issueId] = draggableId.split(['/']);
-    headerStyle.changeStyle(style(SwimLaneId));
+    headerStyle.changeStyle(style(SwimLaneId.replace(/[^\w]/g, '')));
     ScrumBoardStore.setIsDragging(SwimLaneId, true);
   };
 
@@ -164,62 +193,49 @@ class ScrumBoardHome extends Component {
       return;
     }
 
-    const [startStatus, startColumn] = source.droppableId.split(['/']).map(id => parseInt(id, 10));
+    const [startStatus, startColumn] = source.droppableId.split(['/']);
     const startStatusIndex = source.index;
 
-    const [destinationStatus, destinationColumn] = destination.droppableId.split(['/']).map(id => parseInt(id, 10));
+    const [destinationStatus, destinationColumn] = destination.droppableId.split(['/']);
     const destinationStatusIndex = destination.index;
 
     const issue = {
-      ...allDataMap.get(+issueId),
+      ...allDataMap.get(issueId),
       stayDay: 0,
     };
+    const [type, parentId] = SwimLaneId.split('%');
 
-    const [type, parentId] = SwimLaneId.split('-');
-
-    ScrumBoardStore.updateIssue(issue, startStatus, startStatusIndex, destinationStatus, destinationStatusIndex, SwimLaneId).then((data) => {
+    ScrumBoardStore.updateIssue(issue,
+      startStatus,
+      startStatusIndex, destinationStatus,
+      destinationStatusIndex,
+      SwimLaneId).then((data) => {
       if (data.failed) {
         Choerodon.prompt(data.message);
-        ScrumBoardStore.setSwimLaneData(SwimLaneId, startStatus, startStatusIndex, SwimLaneId, destinationStatus, destinationStatusIndex, issue, true);
+        ScrumBoardStore.setSwimLaneData(SwimLaneId,
+          startStatus,
+          startStatusIndex,
+          SwimLaneId, destinationStatus,
+          destinationStatusIndex, issue, true);
       } else {
         if (ScrumBoardStore.getSwimLaneCode === 'parent_child' && parentId !== 'other') {
-          ScrumBoardStore.judgeMoveParentToDone(destinationStatus, SwimLaneId, +parentId, ScrumBoardStore.getStatusMap.get(destinationStatus).categoryCode === 'done');
+          ScrumBoardStore.judgeMoveParentToDone(destinationStatus, SwimLaneId, parentId, ScrumBoardStore.getStatusMap.get(destinationStatus).categoryCode === 'done');
         }
         if (data.issueId === ScrumBoardStore.getCurrentClickId) {
           ScrumBoardStore.editRef.current.loadIssueDetail();
         }
         if (startColumn !== destinationColumn) {
-          ScrumBoardStore.resetHeaderData(startColumn, destinationColumn, issue.issueTypeVO.typeCode);
+          ScrumBoardStore.resetHeaderData(startColumn,
+            destinationColumn,
+            issue.issueTypeVO.typeCode);
         }
         ScrumBoardStore.rewriteObjNumber(data, issueId, issue);
         // ScrumBoardStore.resetHeaderData(startColumn,destinationColumn)
       }
     });
-    ScrumBoardStore.setSwimLaneData(SwimLaneId, startStatus, startStatusIndex, SwimLaneId, destinationStatus, destinationStatusIndex, issue, false);
+    ScrumBoardStore.setSwimLaneData(SwimLaneId, startStatus, startStatusIndex,
+      SwimLaneId, destinationStatus, destinationStatusIndex, issue, false);
   };
-
-  refresh(defaultBoard, url, boardListData) {
-    ScrumBoardStore.setSpinIf(true);
-    Promise.all([ScrumBoardStore.axiosGetIssueTypes(), ScrumBoardStore.axiosGetStateMachine(), ScrumBoardStore.axiosGetBoardData(defaultBoard.boardId), ScrumBoardStore.axiosGetAllEpicData()]).then(([issueTypes, stateMachineMap, defaultBoardData, epicData]) => {
-      this.dataConverter.setSourceData(epicData, defaultBoardData);
-      const renderDataMap = new Map([
-        ['parent_child', this.dataConverter.getParentWithSubData],
-        ['swimlane_epic', this.dataConverter.getEpicData],
-        ['assignee', this.dataConverter.getAssigneeData],
-        ['swimlane_none', this.dataConverter.getAllData],
-        ['undefined', this.dataConverter.getAllData],
-      ]);
-      const renderData = renderDataMap.get(defaultBoard.userDefaultBoard)();
-      const canDragOn = this.dataConverter.getCanDragOn();
-      const statusColumnMap = this.dataConverter.getStatusColumnMap();
-      const statusMap = this.dataConverter.getStatusMap();
-      const mapStructure = this.dataConverter.getMapStructure();
-      const allDataMap = this.dataConverter.getAllDataMap(defaultBoard.userDefaultBoard);
-      const headerData = this.dataConverter.getHeaderData();
-      ScrumBoardStore.scrumBoardInit(AppState, url, boardListData, defaultBoard, defaultBoardData, null, issueTypes, stateMachineMap, canDragOn, statusColumnMap, allDataMap, mapStructure, statusMap, renderData, headerData);
-    });
-  }
-
 
   handleToIterationBoard = () => {
     const { history } = this.props;
@@ -250,7 +266,7 @@ class ScrumBoardHome extends Component {
   }
 
   renderRemainDate = () => (
-    <Fragment>
+    <>
       <Icon type="av_timer" style={{ color: 'rgba(0,0,0,0.6)', marginLeft: 10 }} />
       <span style={{
         paddingLeft: 5,
@@ -261,7 +277,7 @@ class ScrumBoardHome extends Component {
       >
         {`${ScrumBoardStore.getDayRemain >= 0 ? `${ScrumBoardStore.getDayRemain} days剩余` : '无剩余时间'}`}
       </span>
-    </Fragment>
+    </>
   )
 
   renderSwitchMode = () => (
@@ -281,91 +297,57 @@ class ScrumBoardHome extends Component {
     </div>
   )
 
+  refresh = (defaultBoard, url, boardListData) => {
+    ScrumBoardStore.setSpinIf(true);
+    Promise.all([issueTypeApi.loadAllWithStateMachineId(),
+      statusApi.loadAllTransformForAllIssueType(),
+      ScrumBoardStore.axiosGetBoardData(defaultBoard.boardId),
+      epicApi.loadEpics()]).then(([issueTypes, stateMachineMap, defaultBoardData, epicData]) => {
+      this.dataConverter.setSourceData(epicData, defaultBoardData);
+      const renderDataMap = new Map([
+        ['parent_child', this.dataConverter.getParentWithSubData],
+        ['swimlane_epic', this.dataConverter.getEpicData],
+        ['assignee', this.dataConverter.getAssigneeData],
+        ['swimlane_none', this.dataConverter.getAllData],
+        ['undefined', this.dataConverter.getAssigneeData],
+      ]);
+      const renderData = renderDataMap.get(defaultBoard.userDefaultBoard)();
+      const canDragOn = this.dataConverter.getCanDragOn();
+      const statusColumnMap = this.dataConverter.getStatusColumnMap();
+      const statusMap = this.dataConverter.getStatusMap();
+      const mapStructure = this.dataConverter.getMapStructure();
+      const allDataMap = this.dataConverter.getAllDataMap(defaultBoard.userDefaultBoard);
+      const headerData = this.dataConverter.getHeaderData();
+      ScrumBoardStore.scrumBoardInit(
+        AppState,
+        url,
+        boardListData, defaultBoard, defaultBoardData, null,
+        issueTypes, stateMachineMap, canDragOn,
+        statusColumnMap, allDataMap, mapStructure, statusMap,
+        renderData, headerData,
+      );
+    });
+  }
+
+  handlePriorityChange = (value) => {
+    ScrumBoardStore.setPriority(value);
+    this.refresh(ScrumBoardStore.getBoardList.get(ScrumBoardStore.getSelectedBoard));
+  }
+
   render() {
     const { history, HeaderStore } = this.props;
     const {
-      closeSprintVisible,
       updateParentStatus,
     } = this.state;
     const menu = AppState.currentMenuType;
     const { type, id: projectId, organizationId: orgId } = menu;
+    const currentSprintIsDoing = ScrumBoardStore.didCurrentSprintExist && ScrumBoardStore.sprintNotClosedArray.find((item) => item.statusCode === 'started' && item.sprintId === ScrumBoardStore.sprintId);
     return (
-      <Page
-        className="c7n-scrumboard-page"
-        service={[
-          'agile-service.quick-filter.listByProjectId',
-          'base-service.project.list',
-          'agile-service.board.queryByProjectId',
-          'agile-service.board.checkName',
-          'agile-service.board.createScrumBoard',
-          'agile-service.board.move',
-          'agile-service.scheme.queryIssueTypesWithStateMachineIdByProjectId',
-          'agile-service.scheme.queryTransformsMapByProjectId',
-          'agile-service.board.queryByOptions',
-          'agile-service.issue.listEpic',
-          'agile-service.sprint.completeSprint',
-          // 详情侧边接口
-          'base-service.user.querySelf',
-          'base-service.permission.checkPermission',        
-          'agile-service.wiki-relation.queryByIssueId',
-          'agile-service.wiki-relation.create',
-          'agile-service.wiki-relation.deleteById',
-          'agile-service.data-log.listByIssueId',
-          'agile-service.issue-link.listIssueLinkByIssueId',
-          'test-service.test-cycle-case-defect-rel.queryByBug',
-          'agile-service.scheme.queryIssueTypesWithStateMachineIdByProjectId',
-          'agile-service.scheme.queryStatusByIssueTypeId',
-          'agile-service.scheme.queryByOrganizationIdList',
-          'agile-service.scheme.queryTransformsByProjectId',
-          'agile-service.field-value.queryPageFieldViewListWithInstanceId',
-          'agile-service.sprint.queryNameByOptions',
-          'agile-service.product-version.queryNameByOptions',        
-          'agile-service.issue-label.listIssueLabel',
-          'agile-service.issue-component.listByProjectId',
-          'agile-service.issue-attachment.uploadForAddress',
-          'agile-service.issue-attachment.uploadAttachment',
-          'agile-service.issue-attachment.deleteAttachment',
-          'agile-service.issue.queryIssue',
-          'agile-service.issue.listEpicSelectData',
-          'agile-service.issue.createSubIssue',
-          'agile-service.issue.createIssue',
-          'agile-service.issue.updateIssue',
-          'agile-service.issue.updateIssueStatus',
-          'agile-service.issue.cloneIssueByIssueId',
-          'agile-service.issue.deleteIssue',
-          'agile-service.issue.queryIssueByOptionForAgile',
-          'agile-service.issue.transformedSubTask',
-          'agile-service.issue.updateIssueParentId',
-          'agile-service.issue.updateIssueTypeCode',
-          'agile-service.issue-comment.createIssueComment',
-          'agile-service.issue-comment.updateIssueComment',
-          'agile-service.issue-comment.deleteIssueComment',
-          'agile-service.issue-comment.queryIssueCommentList',
-          'agile-service.work-log.createWorkLog',
-          'agile-service.work-log.queryWorkLogListByIssueId',
-          'agile-service.work-log.deleteWorkLog',
-          'agile-service.work-log.updateWorkLog',
-          'agile-service.scheme.queryStatusByIssueTypeId',
-          'devops-service.issue.countCommitAndMergeRequest',
-          'devops-service.app-service.listByActive',
-          'devops-service.devops-git.pageBranchByOptions',
-          'devops-service.devops-git.pageTagsByOptions',
-          'devops-service.devops-git.createBranch',
-        ]}
-      >
+      <>
         <Header title="活跃冲刺">
-          <Permission
-            type={type}
-            projectId={projectId}
-            organizationId={orgId}
-            service={['agile-service.board.createScrumBoard']}
-          >
-            <span />
-          </Permission>
           <Select
             ref={(SelectBoard) => { this.SelectBoard = SelectBoard; }}
             className="SelectTheme primary autoWidth"
-              // value={ScrumBoardStore.getBoardList && ScrumBoardStore.getBoardList.get(ScrumBoardStore.getSelectedBoard)}
             value={ScrumBoardStore.getSelectedBoard}
             style={{
               marginRight: 15, fontWeight: 500, lineHeight: '28px',
@@ -375,7 +357,6 @@ class ScrumBoardHome extends Component {
               width: 200,
             }}
             onChange={(value) => {
-              // console.log('sleee', value, ScrumBoardStore.getBoardList.get(value));
               const selectedBoard = ScrumBoardStore.getBoardList.get(value);
               ScrumBoardStore.setSelectedBoard(value);
               ScrumBoardStore.setSwimLaneCode(selectedBoard.userDefaultBoard);
@@ -383,59 +364,60 @@ class ScrumBoardHome extends Component {
             }}
             footer={(
               <Permission
-                type={type}
-                projectId={projectId}
-                organizationId={orgId}
-                service={['agile-service.board.createScrumBoard']}
+                service={['choerodon.code.project.cooperation.iteration-plan.ps.board.create']}
               >
                 <Button style={{ width: '100%', height: 42, textAlign: 'left' }} onClick={this.handleCreateBoardClick}>创建看板</Button>
               </Permission>
             )}
           >
-  
+
             {// ScrumBoardStore.getSpinIf
-                [...ScrumBoardStore.getBoardList.values()].map(item => (
-                  <Option key={item.boardId} value={item.boardId}>
-                    <Tooltip title={item.name}>
-                      {item.name}
-                    </Tooltip>
-                  </Option>
-                ))
-              }
+              [...ScrumBoardStore.getBoardList.values()].map((item) => (
+                <Option key={item.boardId} value={item.boardId}>
+                  <Tooltip title={item.name}>
+                    {item.name}
+                  </Tooltip>
+                </Option>
+              ))
+            }
           </Select>
+          <ScrumBoardFullScreen />
+          <HeaderLine />
+          <Button
+            className="c7n-scrumboard-settingButton"
+            funcType="flat"
+            icon="settings"
+            style={{
+              marginRight: 15,
+            }}
+            onClick={() => {
+              const urlParams = AppState.currentMenuType;
+              history.push(`/agile/scrumboard/setting?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&boardId=${ScrumBoardStore.getSelectedBoard}`);
+            }}
+          >
+            配置看板
+          </Button>
           {
-            ScrumBoardStore.didCurrentSprintExist && (
-            <Fragment>
-              
-              <HaederLine />
-              <Button
-                funcType="flat"
-                icon="settings"
-                style={{
-                  marginRight: 15,
-                }}
-                onClick={() => {
-                  const urlParams = AppState.currentMenuType;
-                  history.push(`/agile/scrumboard/setting?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&boardId=${ScrumBoardStore.getSelectedBoard}`);
-                }}
-              >
-              配置看板
-              </Button>
-              {this.renderRemainDate()}
-              <Button
-                style={{
-                  marginLeft: 15,
-                }}
-                icon="alarm_on"
-                onClick={this.handleFinishSprint}
-              >
-              完成冲刺
-  
-              </Button>
-              {this.renderSwitchMode()}
-            </Fragment>
+            currentSprintIsDoing && (
+              <>
+                {this.renderRemainDate()}
+                <Permission
+                  service={['choerodon.code.project.cooperation.iteration-plan.ps.sprint.finish']}
+                >
+                  <Button
+                    style={{
+                      marginLeft: 15,
+                    }}
+                    icon="alarm_on"
+                    onClick={this.handleFinishSprint}
+                  >
+                    完成冲刺
+                  </Button>
+                </Permission>
+                {this.renderSwitchMode()}
+              </>
             )
-          }          
+          }
         </Header>
         <Breadcrumb />
         <Content style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
@@ -443,8 +425,10 @@ class ScrumBoardHome extends Component {
             <QuickSearch
               onQuickSearchChange={this.onQuickSearchChange}
               onAssigneeChange={this.onAssigneeChange}
+              onSprintChange={this.onSprintChange}
               style={{ height: 32, margin: '0 0 16px 16px' }}
             />
+            <SelectPriority onChange={this.handlePriorityChange} />
             {ScrumBoardStore.hasSetFilter && <Button type="primary" onClick={this.handleClearFilter}>清除筛选</Button>}
           </div>
           <Spin spinning={ScrumBoardStore.getSpinIf}>
@@ -453,9 +437,16 @@ class ScrumBoardHome extends Component {
                 <div className="c7n-scrumboard-header">
                   <StatusColumn />
                 </div>
-                {!ScrumBoardStore.didCurrentSprintExist ? (
-                  <NoneSprint />
-                )
+                {(!ScrumBoardStore.didCurrentSprintExist
+                  || ((!ScrumBoardStore.otherIssue || ScrumBoardStore.otherIssue.length === 0)
+                    && (!ScrumBoardStore.interconnectedData
+                      || ScrumBoardStore.interconnectedData.size === 0))) ? (
+                        <NoneSprint
+                          doingSprintExist={ScrumBoardStore.didCurrentSprintExist}
+                          hasSetFilter={ScrumBoardStore.hasSetFilter}
+                          quickSearchObj={ScrumBoardStore.quickSearchObj}
+                        />
+                  )
                   : (
                     <div
                       className="c7n-scrumboard-content"
@@ -474,27 +465,11 @@ class ScrumBoardHome extends Component {
                   )}
               </div>
               <IssueDetail
-                refresh={this.refresh.bind(this)}
+                refresh={this.refresh}
               />
             </div>
           </Spin>
         </Content>
-        <CloseSprint
-          store={BacklogStore}
-          visible={closeSprintVisible}
-          onCancel={() => {
-            this.setState({
-              closeSprintVisible: false,
-            });
-          }}
-          refresh={() => {
-            this.refresh(ScrumBoardStore.getBoardList.get(ScrumBoardStore.getSelectedBoard));
-          }}
-          data={{
-            sprintId: ScrumBoardStore.getSprintId,
-            sprintName: ScrumBoardStore.getSprintName,
-          }}
-        />
         {
           ScrumBoardStore.getUpdateParent ? (
             <Modal
@@ -512,10 +487,11 @@ class ScrumBoardHome extends Component {
                   objectVersionNumber: ScrumBoardStore.getUpdatedParentIssue.objectVersionNumber,
                   transformId: updateParentStatus || ScrumBoardStore.getTransformToCompleted[0].id,
                 };
-                ScrumBoardStore.axiosUpdateIssue(data).then((res) => {
+                issueApi.updateStatus(data.transformId, data.issueId,
+                  data.objectVersionNumber).then((res) => {
                   ScrumBoardStore.setUpdateParent(false);
                   this.refresh(ScrumBoardStore.getBoardList.get(ScrumBoardStore.getSelectedBoard));
-                }).catch((error) => {
+                }).catch(() => {
                 });
               }}
               disableOk={!ScrumBoardStore.getTransformToCompleted.length}
@@ -539,7 +515,7 @@ class ScrumBoardHome extends Component {
                   defaultValue={ScrumBoardStore.getTransformToCompleted.length ? ScrumBoardStore.getTransformToCompleted[0].id : '无'}
                 >
                   {
-                    ScrumBoardStore.getTransformToCompleted.map(item => (
+                    ScrumBoardStore.getTransformToCompleted.map((item) => (
                       <Option
                         key={item.id}
                         value={item.id}
@@ -553,9 +529,19 @@ class ScrumBoardHome extends Component {
             </Modal>
           ) : null
         }
-      </Page>
+      </>
     );
   }
 }
-
-export default Form.create()(ScrumBoardHome);
+export default (props) => (
+  <Page
+    className="c7n-scrumboard-page"
+    service={[...[
+      'choerodon.code.project.cooperation.iteration-plan.ps.default',
+      'choerodon.code.project.cooperation.iteration-plan.ps.board.create',
+      'choerodon.code.project.cooperation.iteration-plan.ps.sprint.finish',
+    ], ...service]}
+  >
+    <ScrumBoardHome {...props} />
+  </Page>
+);

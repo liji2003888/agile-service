@@ -36,7 +36,7 @@ const SelectFocusLoad = (props) => {
   } = totalProps;
   const [loading, setLoading] = useState(false);
   const [List, setList] = useState(defaultOption ? [defaultOption] : []);
-  const [extraList, setExtraList] = useState(false);
+  const [extraList, setExtraList] = useState([]);
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState(1);
   const [canLoadMore, setCanLoadMore] = useState(false);
@@ -121,7 +121,7 @@ const SelectFocusLoad = (props) => {
       onFilterChange={handleFilterChange}
       {...TypeProps}
       {...props}
-      dropdownClassName="hidden-text hidden-label"
+      dropdownClassName="hidden-text hidden-label minSelectFocusLoadDropDownWidth"
     >
       {Options}
       <Option style={{ display: canLoadMore || Options.length === 0 ? 'block' : 'none', cursor: 'pointer' }} key="SelectFocusLoad-loadMore" className="SelectFocusLoad-loadMore" disabled>

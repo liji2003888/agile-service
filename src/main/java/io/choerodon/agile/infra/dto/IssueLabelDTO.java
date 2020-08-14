@@ -1,15 +1,16 @@
 package io.choerodon.agile.infra.dto;
 
 
-import io.choerodon.mybatis.entity.BaseDTO;
+
+import io.choerodon.mybatis.annotation.ModifyAudit;
+import io.choerodon.mybatis.annotation.VersionAudit;
+import io.choerodon.mybatis.domain.AuditDomain;
 import io.choerodon.agile.infra.utils.StringUtil;
+import org.hzero.starter.keyencrypt.core.Encrypt;
 
 import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
-import javax.validation.constraints.NotNull;
-
 /**
  * 敏捷开发Issue标签
  *
@@ -17,7 +18,9 @@ import javax.validation.constraints.NotNull;
  * @since 2018-05-14 21:04:00
  */
 @Table(name = "agile_issue_label")
-public class IssueLabelDTO extends BaseDTO {
+@ModifyAudit
+@VersionAudit
+public class IssueLabelDTO extends AuditDomain {
 
     public IssueLabelDTO() {}
 
@@ -28,7 +31,8 @@ public class IssueLabelDTO extends BaseDTO {
 
     /***/
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue
+    @Encrypt
     private Long labelId;
 
     /**
@@ -39,7 +43,6 @@ public class IssueLabelDTO extends BaseDTO {
     /**
      * 项目id
      */
-    @NotNull(message = "error.IssueLabel.projectIdNotNull")
     private Long projectId;
 
     public Long getLabelId() {

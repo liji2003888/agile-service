@@ -9,6 +9,7 @@ import {
   Button, Tabs, Table, Select, Icon, Tooltip, Spin,
 } from 'choerodon-ui';
 // import pic from './no_epic.svg';
+import STATUS from '@/constants/STATUS';
 import pic from '../../../../assets/image/emptyChart.svg';
 import finish from './legend/finish.svg';
 import SwithChart from '../../Component/switchChart';
@@ -18,7 +19,6 @@ import TypeTag from '../../../../components/TypeTag';
 import ES from '../../../../stores/project/epicReport';
 import EmptyBlock from '../../../../components/EmptyBlock';
 import './EpicReport.less';
-import { STATUS } from '../../../../common/Constant';
 
 const { TabPane } = Tabs;
 const { AppState } = stores;
@@ -486,7 +486,7 @@ class EpicReport extends Component {
               onClick={() => {
                 const { history } = this.props;
                 const urlParams = AppState.currentMenuType;
-                history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramName=${issueNum}&paramIssueId=${record.issueId}&paramUrl=reporthost/EpicReport`);
+                history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramName=${issueNum}&paramIssueId=${encodeURIComponent(record.issueId)}&paramUrl=reporthost/EpicReport`);
               }}
             >
               {issueNum}
@@ -549,7 +549,6 @@ class EpicReport extends Component {
               <Tooltip mouseEnterDelay={0.5} title={`任务状态： ${record.statusVO.name}`}>
                 <span>
                   <StatusTag
-                    inTable
                     style={{ display: 'inline-block', minWidth: 50 }}
                     name={record.statusVO.name}
                     color={STATUS[record.statusVO.type]}
@@ -591,7 +590,7 @@ class EpicReport extends Component {
     const { linkFromParamUrl } = this.state;
     const urlParams = AppState.currentMenuType;
     return (
-      <Page className="c7n-epicReport">
+      <Page className="c7n-epicReport" service={['choerodon.code.project.operation.chart.ps.choerodon.code.project.operation.chart.ps.epicreport']}>
         <Header
           title="史诗报告图"
           // backPath={`/agile/${linkFromParamUrl || 'reporthost'}?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}`}
@@ -712,7 +711,7 @@ class EpicReport extends Component {
                               }}
                               role="none"
                               onClick={() => {
-                                history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramType=epic&paramId=${ES.currentEpicId}&paramName=${encodeURIComponent(`${ES.epics.find(x => x.issueId === ES.currentEpicId).epicName}下的问题`)}&paramUrl=reporthost/EpicReport`);
+                                history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}&paramType=epic&paramId=${encodeURIComponent(ES.currentEpicId)}&paramName=${encodeURIComponent(`${ES.epics.find(x => x.issueId === ES.currentEpicId).epicName}下的问题`)}&paramUrl=reporthost/EpicReport`);
                               }}
                             >
                               在“问题管理”中查看
@@ -722,8 +721,8 @@ class EpicReport extends Component {
                         </div>
                       ) : (
                         <div style={{ padding: '30px 0 20px', textAlign: 'center' }}>
-                            {ES.tableData.length ? '当前单位下问题均未预估，切换单位或从下方问题列表进行预估。' : '当前史诗下没有问题。'}
-                          </div>
+                          {ES.tableData.length ? '当前单位下问题均未预估，切换单位或从下方问题列表进行预估。' : '当前史诗下没有问题。'}
+                        </div>
                       )
                     }
                   </div>
@@ -746,38 +745,38 @@ class EpicReport extends Component {
               </div>
             ) : (
               <EmptyBlock
-                  style={{ marginTop: 40 }}
-                  textWidth="auto"
-                  pic={pic}
-                  title="当前项目无可用史诗"
-                  des={(
-                    <div>
-                      <span>请在</span>
-                      <span
-                        className="primary"
-                        style={{ margin: '0 5px', cursor: 'pointer' }}
-                        role="none"
-                        onClick={() => {
-                          history.push(`/agile/work-list/backlog?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}`);
-                        }}
-                      >
-                        待办事项
-                      </span>
-                      <span>或</span>
-                      <span
-                        className="primary"
-                        style={{ margin: '0 5px', cursor: 'pointer' }}
-                        role="none"
-                        onClick={() => {
-                          history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}`);
-                        }}
-                      >
-                        问题管理
-                      </span>
-                      <span>中创建一个史诗</span>
-                    </div>
-                  )}
-                />
+                style={{ marginTop: 40 }}
+                textWidth="auto"
+                pic={pic}
+                title="当前项目无可用史诗"
+                des={(
+                  <div>
+                    <span>请在</span>
+                    <span
+                      className="primary"
+                      style={{ margin: '0 5px', cursor: 'pointer' }}
+                      role="none"
+                      onClick={() => {
+                        history.push(`/agile/work-list/backlog?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}`);
+                      }}
+                    >
+                      待办事项
+                    </span>
+                    <span>或</span>
+                    <span
+                      className="primary"
+                      style={{ margin: '0 5px', cursor: 'pointer' }}
+                      role="none"
+                      onClick={() => {
+                        history.push(`/agile/work-list/issue?type=${urlParams.type}&id=${urlParams.id}&name=${encodeURIComponent(urlParams.name)}&organizationId=${urlParams.organizationId}&orgId=${urlParams.organizationId}`);
+                      }}
+                    >
+                      问题管理
+                    </span>
+                    <span>中创建一个史诗</span>
+                  </div>
+                )}
+              />
             )
           }
         </Content>

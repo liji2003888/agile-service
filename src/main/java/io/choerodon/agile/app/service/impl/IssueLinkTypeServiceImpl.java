@@ -3,20 +3,19 @@ package io.choerodon.agile.app.service.impl;
 import io.choerodon.agile.api.vo.IssueLinkTypeCreateVO;
 import io.choerodon.agile.api.vo.IssueLinkTypeSearchVO;
 
-import com.github.pagehelper.PageInfo;
-import com.github.pagehelper.PageHelper;
+import io.choerodon.agile.infra.utils.PageUtil;
+import io.choerodon.core.domain.Page;
 
 import io.choerodon.agile.api.vo.IssueLinkTypeVO;
-import io.choerodon.agile.infra.utils.PageUtil;
 import io.choerodon.agile.infra.dto.IssueLinkDTO;
 import io.choerodon.agile.infra.dto.IssueLinkTypeDTO;
 import io.choerodon.agile.infra.mapper.IssueLinkMapper;
-import io.choerodon.web.util.PageableHelper;
-import org.springframework.data.domain.Pageable;
+import io.choerodon.mybatis.pagehelper.PageHelper;
+import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 
 import io.choerodon.core.exception.CommonException;
 import org.modelmapper.ModelMapper;
-import org.modelmapper.convention.MatchingStrategies;
+import org.modelmapper.TypeToken;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,8 +23,10 @@ import org.springframework.transaction.annotation.Transactional;
 import io.choerodon.agile.app.assembler.IssueLinkTypeAssembler;
 import io.choerodon.agile.app.service.IssueLinkTypeService;
 import io.choerodon.agile.infra.mapper.IssueLinkTypeMapper;
+import org.springframework.util.CollectionUtils;
 
-import javax.annotation.PostConstruct;
+import java.util.List;
+
 
 /**
  * @author dinghuang123@gmail.com
@@ -44,19 +45,17 @@ public class IssueLinkTypeServiceImpl implements IssueLinkTypeService {
     private IssueLinkTypeAssembler issueLinkTypeAssembler;
     @Autowired
     private IssueLinkMapper issueLinkMapper;
-
-
-    private ModelMapper modelMapper = new ModelMapper();
-
-    @PostConstruct
-    public void init() {
-        modelMapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
-    }
+    @Autowired
+    private ModelMapper modelMapper;
 
     @Override
-    public PageInfo<IssueLinkTypeVO> listIssueLinkType(Long projectId, Long issueLinkTypeId, IssueLinkTypeSearchVO issueLinkTypeSearchVO, Pageable pageable) {
-        return PageHelper.startPage(pageable.getPageNumber(), pageable.getPageSize(), PageableHelper.getSortSql(pageable.getSort())).
-                doSelectPageInfo(() -> issueLinkTypeMapper.queryIssueLinkTypeByProjectId(projectId, issueLinkTypeId, issueLinkTypeSearchVO.getLinkName(), issueLinkTypeSearchVO.getContents()));
+    public Page<IssueLinkTypeVO> listIssueLinkType(Long projectId, Long issueLinkTypeId, IssueLinkTypeSearchVO issueLinkTypeSearchVO, PageRequest pageRequest) {
+        Page<IssueLinkTypeDTO> page = PageHelper.doPageAndSort(pageRequest, () -> issueLinkTypeMapper.queryIssueLinkTypeByProjectId(projectId, issueLinkTypeId, issueLinkTypeSearchVO.getLinkName(), issueLinkTypeSearchVO.getContents()));
+        List<IssueLinkTypeDTO> content = page.getContent();
+        if(CollectionUtils.isEmpty(content)){
+            return new Page<>();
+        }
+        return PageUtil.buildPageInfoWithPageInfoList(page,modelMapper.map(content,new TypeToken<List<IssueLinkTypeVO>>() {}.getType()));
     }
 
     @Override

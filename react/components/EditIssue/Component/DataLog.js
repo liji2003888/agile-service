@@ -19,8 +19,6 @@ const PROP = {
   assignee: '经办人',
   reporter: '报告人',
   Pi: 'PI',
-};
-const PROP_SIMPLE = {
   Component: '模块',
   'Fix Version': '版本',
   'Epic Child': '史诗关联任务',
@@ -41,7 +39,10 @@ const PROP_SIMPLE = {
   Comment: '评论',
   'Feature Link': '特性',
   'Knowledge Relation': '知识文档',
+  SubTeam: '负责的子团队',
+  'Backlog Link': '需求',
 };
+
 
 class DataLog extends Component {
   getMode1(datalog) {
@@ -50,16 +51,19 @@ class DataLog extends Component {
     } = datalog;
     if ((!oldValue && oldValue !== 0) && (newValue || newValue === 0)) {
       // null -> xxx
-      if (['Knowledge Relation', 'Feature Link', 'labels', 'Component', 'Fix Version', 'Epic Child', 'WorklogId', 'Feature Child', 'issue_epic', 'story', 'bug', 'task', 'sub_task', 'feature'].includes(field)) {
+      if (['Knowledge Relation', 'Feature Link', 'labels', 'Component', 'Fix Version', 'Epic Child', 'WorklogId', 'Feature Child', 'issue_epic', 'story', 'bug', 'task', 'sub_task', 'feature', 'SubTeam'].includes(field)) {
         return '添加';
       }
       if (['Attachment'].includes(field)) {
         return '上传';
       }
+      if(field === 'Backlog Link') {
+        return '关联';
+      }
       return '更新';
     } else if ((oldValue || oldValue === 0) && (newValue || newValue === 0)) {
       // xxx -> yyy
-      if (['Feature Link', 'Epic Link', 'issuetype', 'Sprint', 'Pi', 'Story Points', 'timeestimate', 'summary', 'Epic Name', 'priority', 'assignee', 'reporter'].includes(field)) {
+      if (['Feature Link', 'Epic Link', 'issuetype', 'Sprint', 'Pi', 'Story Points', 'timeestimate', 'summary', 'Epic Name', 'priority', 'assignee', 'reporter', 'SubTeam'].includes(field)) {
         return '将';
       }
       if (['description', 'WorklogId', 'Comment', 'timespent'].includes(field)) {
@@ -70,6 +74,9 @@ class DataLog extends Component {
         return '将';
       }
       if (field === 'status') {
+        if (categoryCode === 'prepare') {
+          return '置为准备';
+        }
         if (categoryCode === 'doing') {
           return '开始处理';
         }
@@ -80,9 +87,15 @@ class DataLog extends Component {
           return '置为待办';
         }
       }
+      if(field === 'Backlog Link') {
+        if(_.difference(newString && newString.split(','), oldString && oldString.split(',')).length > 0) {
+          return '关联';
+        }
+        return '移除';
+      }
     } else if ((oldValue || oldValue === 0) && (!newValue && newValue !== 0)) {
       // yyy -> null
-      if (['Knowledge Relation', 'Feature Link', 'Epic Link', 'Sprint', 'Pi', 'assignee', 'reporter', 'labels', 'Component', 'Fix Version', 'Epic Child', 'Feature Child', 'resolution'].includes(field)) {
+      if (['Knowledge Relation', 'Feature Link', 'Epic Link', 'Sprint', 'Pi', 'assignee', 'reporter', 'labels', 'Component', 'Fix Version', 'Epic Child', 'Feature Child', 'resolution', 'SubTeam', 'Backlog Link'].includes(field)) {
         return '移除';
       }
       if (['Story Points', 'timeestimate'].includes(field)) {
@@ -137,6 +150,7 @@ class DataLog extends Component {
         }
         return '移除';
       }
+      
       // 自定义字段
       if (isCusLog) {
         return '将';
@@ -154,7 +168,7 @@ class DataLog extends Component {
     if (field === 'status') {
       return '';
     }
-    return ` 【${PROP[field] || PROP_SIMPLE[field]}】 `;
+    return ` 【${PROP[field]}】 `;
   }
 
   // ['由', '']
@@ -171,7 +185,7 @@ class DataLog extends Component {
       if (isCusLog) {
         return '由';
       }
-      if (['Feature Link', 'Epic Link', 'issuetype', 'Sprint', 'Pi', 'Story Points', 'timeestimate', 'summary', 'Epic Name', 'priority', 'assignee', 'reporter'].includes(field)) {
+      if (['Feature Link', 'Epic Link', 'issuetype', 'Sprint', 'Pi', 'Story Points', 'timeestimate', 'summary', 'Epic Name', 'priority', 'assignee', 'reporter', 'SubTeam'].includes(field)) {
         return '由';
       } else {
         return '';
@@ -207,7 +221,7 @@ class DataLog extends Component {
       return '';
     } else if ((oldValue || oldValue === 0) && (newValue || newValue === 0)) {
       // xxx -> yyy
-      if (['Feature Link', 'Epic Link', 'issuetype', 'Sprint', 'Pi', 'Story Points', 'timeestimate', 'summary', 'Epic Name', 'priority', 'assignee', 'reporter'].includes(field)) {
+      if (['Feature Link', 'Epic Link', 'issuetype', 'Sprint', 'Pi', 'Story Points', 'timeestimate', 'summary', 'Epic Name', 'priority', 'assignee', 'reporter', 'SubTeam'].includes(field)) {
         return ` 【${oldString}】 `;
       }
       if (['description', 'WorklogId', 'Rank', 'Comment'].includes(field)) {
@@ -227,8 +241,10 @@ class DataLog extends Component {
       } else if (['timespent', 'Comment'].includes(field)) {
         return '';
       } else if (field === 'Attachment') {
-        const attachnewArr = oldString.split('_');
-        return ` 【${decodeURI(attachnewArr.slice(2, attachnewArr.length).join('_'))}】 `;
+        const attachnewArr = oldString.split('@');
+        return ` 【${decodeURI(attachnewArr.slice(1, attachnewArr.length).join('_'))}】 `;
+      } else if(field === 'Backlog Link') {
+          return`【${ _.difference(oldString && oldString.split(','))}】`;
       } else {
         return ` 【${oldString}】 `;
       }
@@ -248,6 +264,7 @@ class DataLog extends Component {
         }
         return ` 【${oldString}】 `;
       }
+      
       // 自定义字段
       if (isCusLog) {
         return oldString ? ` 【${oldString}】 ` : ' 空 ';
@@ -273,7 +290,7 @@ class DataLog extends Component {
       return '';
     } else if ((oldValue || oldValue === 0) && (newValue || newValue === 0)) {
       // xxx -> yyy
-      if (['Feature Link', 'Epic Link', 'issuetype', 'Sprint', 'Pi', 'Story Points', 'timeestimate', 'summary', 'Epic Name', 'priority', 'assignee', 'reporter'].includes(field)) {
+      if (['Feature Link', 'Epic Link', 'issuetype', 'Sprint', 'Pi', 'Story Points', 'timeestimate', 'summary', 'Epic Name', 'priority', 'assignee', 'reporter', 'SubTeam'].includes(field)) {
         return '改变为';
       }
       // 自定义字段
@@ -322,8 +339,11 @@ class DataLog extends Component {
       //   return ` 【${TYPEARR[typeCode]}】 `;
       // }
       if (field === 'Attachment') {
-        const attachnewArr = newString.split('_');
-        return ` 【${decodeURI(attachnewArr.slice(2, attachnewArr.length).join('_'))}】 `;
+        const attachnewArr = newString.split('@');
+        return ` 【${decodeURI(attachnewArr.slice(1, attachnewArr.length).join('_'))}】 `;
+      }
+      if(field === 'Backlog Link') {
+        return `【${newString && newString.split(',')}】`;
       }
       // 自定义字段
       if (isCusLog) {
@@ -331,7 +351,7 @@ class DataLog extends Component {
       }
     } else if ((oldValue || oldValue === 0) && (newValue || newValue === 0)) {
       // xxx -> yyy
-      if (['Feature Link', 'Epic Link', 'issuetype', 'Sprint', 'Pi', 'Story Points', 'timeestimate', 'summary', 'Epic Name', 'priority', 'assignee', 'reporter', 'labels', 'Component', 'Fix Version', 'Epic Child', 'Feature Child'].includes(field)) {
+      if (['Feature Link', 'Epic Link', 'issuetype', 'Sprint', 'Pi', 'Story Points', 'timeestimate', 'summary', 'Epic Name', 'priority', 'assignee', 'reporter', 'labels', 'Component', 'Fix Version', 'Epic Child', 'Feature Child', 'SubTeam'].includes(field)) {
         return ` 【${newString}】 `;
       }
       if (['description', 'Attachment', 'WorklogId', 'Rank', 'Comment', 'timespent'].includes(field)) {
@@ -339,6 +359,13 @@ class DataLog extends Component {
       }
       if (field === 'status') {
         return '';
+      }
+      if(field === 'Backlog Link') {
+        if( _.difference(newString && newString.split(','), oldString && oldString.split(',')).length > 0) {
+          return `【${_.difference(newString && newString.split(','), oldString && oldString.split(',')).join(',')}】`
+        } else {
+          return `【${_.difference(oldString && oldString.split(','), newString && newString.split(',')).join(',')}】`;
+        }
       }
       // 自定义字段
       if (isCusLog) {
@@ -370,6 +397,7 @@ class DataLog extends Component {
         }
         return '';
       }
+      
       // 自定义字段
       if (isCusLog) {
         return newString ? ` 【${newString}】 ` : ' 空 ';

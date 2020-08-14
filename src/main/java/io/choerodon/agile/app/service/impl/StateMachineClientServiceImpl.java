@@ -14,6 +14,7 @@ import io.choerodon.agile.infra.feign.BaseFeignClient;
 import io.choerodon.agile.infra.mapper.IssueMapper;
 import io.choerodon.agile.infra.mapper.ProjectInfoMapper;
 import io.choerodon.agile.infra.mapper.RankMapper;
+import io.choerodon.agile.infra.utils.BaseFieldUtil;
 import io.choerodon.agile.infra.utils.ConvertUtil;
 import io.choerodon.agile.infra.utils.EnumUtil;
 import io.choerodon.agile.infra.utils.RankUtil;
@@ -29,13 +30,11 @@ import io.choerodon.agile.infra.statemachineclient.dto.InputDTO;
 import io.choerodon.agile.infra.statemachineclient.dto.StateMachineConfigDTO;
 import io.choerodon.agile.infra.statemachineclient.dto.StateMachineTransformDTO;
 import org.modelmapper.ModelMapper;
-import org.modelmapper.convention.MatchingStrategies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.PostConstruct;
 import java.util.*;
 
 /**
@@ -88,13 +87,10 @@ public class StateMachineClientServiceImpl implements StateMachineClientService 
     private StateMachineTransformService transformService;
     @Autowired
     private InstanceService instanceService;
-
-    private ModelMapper modelMapper = new ModelMapper();
-
-    @PostConstruct
-    public void init() {
-        modelMapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
-    }
+    @Autowired
+    private ModelMapper modelMapper;
+    @Autowired
+    private StatusTransferSettingService statusTransferSettingService;
 
     private void insertRank(Long projectId, Long issueId, String type, RankVO rankVO) {
         List<RankDTO> rankDTOList = new ArrayList<>();
@@ -119,7 +115,7 @@ public class StateMachineClientServiceImpl implements StateMachineClientService 
         rankMapper.batchInsertRank(projectId, type, rankDTOList);
     }
 
-    private void initRank(IssueCreateVO issueCreateVO, Long issueId, String type) {
+    protected void initRank(IssueCreateVO issueCreateVO, Long issueId, String type) {
         if (issueCreateVO.getProjectId() != null) {
             insertRank(issueCreateVO.getProjectId(), issueId, type, issueCreateVO.getRankVO());
         }
@@ -160,6 +156,7 @@ public class StateMachineClientServiceImpl implements StateMachineClientService 
         issueConvertDTO.setApplyType(applyType);
         issueService.handleInitIssue(issueConvertDTO, initStatusId, projectInfo);
         Long issueId = issueAccessDataService.create(issueConvertDTO).getIssueId();
+        BaseFieldUtil.updateIssueLastUpdateInfo(issueConvertDTO.getRelateIssueId(), issueConvertDTO.getProjectId());
         // 创建史诗，初始化排序
         if ("issue_epic".equals(issueCreateVO.getTypeCode())) {
             initRank(issueCreateVO, issueId, "epic");
@@ -207,7 +204,7 @@ public class StateMachineClientServiceImpl implements StateMachineClientService 
         //初始化subIssue
         issueService.handleInitSubIssue(subIssueConvertDTO, initStatusId, projectInfo);
         Long issueId = issueAccessDataService.create(subIssueConvertDTO).getIssueId();
-
+        BaseFieldUtil.updateIssueLastUpdateInfo(issueSubCreateVO.getParentIssueId(), issueSubCreateVO.getProjectId());
         CreateSubIssuePayload createSubIssuePayload = new CreateSubIssuePayload(issueSubCreateVO, subIssueConvertDTO, projectInfo);
         InputDTO inputDTO = new InputDTO(issueId, JSON.toJSONString(createSubIssuePayload));
         //通过状态机客户端创建实例, 反射验证/条件/后置动作
@@ -230,16 +227,22 @@ public class StateMachineClientServiceImpl implements StateMachineClientService 
         if (issue == null) {
             throw new CommonException(ERROR_ISSUE_NOT_FOUND);
         }
+        if (!projectId.equals(issue.getProjectId())) {
+            throw new CommonException("error.project.id.illegal");
+        }
         //获取状态机id
         Long stateMachineId = projectConfigService.queryStateMachineId(projectId, applyType, issue.getIssueTypeId());
         if (stateMachineId == null) {
             throw new CommonException(ERROR_ISSUE_STATE_MACHINE_NOT_FOUND);
         }
+        // 查询要转换的状态是否有流转条件
+        Long endStatusId = transformService.queryDeployTransformForAgile(organizationId, transformId).getEndStatusId();
+        statusTransferSettingService.checkStatusTransferSetting(projectId,issue.getIssueTypeId(),endStatusId);
         Long currentStatusId = issue.getStatusId();
         //执行状态转换
         ExecuteResult executeResult = instanceService.executeTransform(organizationId, AGILE_SERVICE, stateMachineId, currentStatusId, transformId, inputDTO);
         if (!executeResult.getSuccess()) {
-            throw new CommonException("error.stateMachine.executeTransform");
+            throw new CommonException("error.stateMachine.executeTransform", executeResult.getException());
         }
         return executeResult;
     }
@@ -264,6 +267,9 @@ public class StateMachineClientServiceImpl implements StateMachineClientService 
         IssueDTO issue = issueMapper.selectByPrimaryKey(issueId);
         if (issue == null) {
             throw new CommonException(ERROR_ISSUE_NOT_FOUND);
+        }
+        if (!projectId.equals(issue.getProjectId())) {
+            throw new CommonException("error.project.id.illegal");
         }
         //获取状态机id
         Long stateMachineId = projectConfigService.queryStateMachineId(projectId, applyType, issue.getIssueTypeId());

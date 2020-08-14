@@ -187,7 +187,7 @@ public interface ReportMapper {
      */
     List<ReportIssueDTO> queryIssueValueAfterSprint(@Param("sprintDTO") SprintDTO sprintDTO, @Param("field") String field);
 
-    List<Long> queryReportIssueIds(@Param("projectId") Long projectId, @Param("sprintId") Long sprintId, @Param("startDate") Date startDate, @Param("actualEndDate") Date actualEndDate, @Param("status") Boolean status);
+    List<Long> queryReportIssueIds(@Param("projectId") Long projectId, @Param("sprintId") Long sprintId, @Param("actualEndDate") Date actualEndDate, @Param("status") Boolean status);
 
     List<IssueDTO> queryIssueByIssueIds(@Param("projectId") Long projectId, @Param("issueIds") List<Long> issueIds);
 
@@ -410,4 +410,28 @@ public interface ReportMapper {
     Set<Long> queryRemoveIssueIds();
 
     ReportIssueDTO queryLastResolutionBeforeMoveOutSprint(@Param("projectId") Long projectId, @Param("issueId") Long issueId, @Param("outDate") Date outDate);
+
+    /**
+     * 获取冲刺开启前的bug
+     *
+     * @param sprintDTO sprintDTO
+     * @return issueIds
+     */
+    List<Long> queryBugIdsBeforeSprintStart(@Param("sprintDTO") SprintDTO sprintDTO);
+
+    /**
+     * 获取冲刺期间加入的bug
+     *
+     * @param sprintDTO sprintDTO
+     * @return issueIdList
+     */
+    List<Long> queryAddBugIdsDuringSprint(@Param("sprintDTO") SprintDTO sprintDTO);
+
+    /**
+     * 冲刺期间移出的issue
+     *
+     * @param sprintDTO sprintDTO
+     * @return Long
+     */
+    List<Long> queryRemoveBugIdsDuringSprint(@Param("sprintDTO") SprintDTO sprintDTO);
 }

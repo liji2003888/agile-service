@@ -1,23 +1,22 @@
 import React, {
-  Component, useState, useEffect, useContext,
+  useState, useEffect, useContext,
 } from 'react';
 import { observer } from 'mobx-react-lite';
-import { withRouter, Link } from 'react-router-dom';
 import {
   Table, Button, Modal, Form, Select, Input, Tooltip, Menu,
-  Breadcrumb as Bread,
 } from 'choerodon-ui';
 import { FormattedMessage } from 'react-intl';
 import {
   Content, Header, TabPage as Page, Breadcrumb, Choerodon,
 } from '@choerodon/boot';
-import { getStageMap, getStageList } from '../../../common/utils';
+import { getStageMap, getStageList } from '@/utils/stateMachine';
+import { statusApi } from '@/api';
 import Store from './stores';
 import './StateList.less';
 import TableDropMenu from '../../../common/TableDropMenu';
 
+const backlogStates = ['backlog_pending_approval', 'backlog_rejected', 'backlog_create', 'backlog_planning', 'backlog_processing', 'backlog_developed', 'backlog_publish'];
 const { Sidebar, info } = Modal;
-const { Item } = Bread;
 const FormItem = Form.Item;
 const { TextArea } = Input;
 const { Option } = Select;
@@ -84,7 +83,7 @@ function StateList(props) {
       content: (
         <ul className="issue-state-ul">
           {
-            data.stateMachineInfoList.map(stateMachine => (
+            data.stateMachineInfoList.map((stateMachine) => (
               <li key={stateMachine.stateMachineId}>
                 <a
                   role="none"
@@ -104,9 +103,9 @@ function StateList(props) {
     });
   };
 
-  const showSideBar = (state, newid = '') => {
+  const showSideBar = (state, newId = '') => {
     if (state === 'edit') {
-      stateStore.loadStateById(orgId, newid).then((data) => {
+      statusApi.load(newId).then((data) => {
         if (data && data.failed) {
           Choerodon.prompt(data.message);
         } else {
@@ -138,7 +137,6 @@ function StateList(props) {
         total: data.total,
       });
 
-
       if (isSetInitialTotal) {
         setInitialTotal(data.total);
       }
@@ -146,7 +144,7 @@ function StateList(props) {
   };
 
   const handleDelete = () => {
-    stateStore.deleteState(orgId, deleteId).then((data) => {
+    statusApi.delete(deleteId).then((data) => {
       if (data && data.failed) {
         Choerodon.prompt(data.message);
       } else {
@@ -165,7 +163,6 @@ function StateList(props) {
     setEditState(false);
   };
 
-
   const handleSubmit = () => {
     const { form } = props;
     // const {
@@ -174,10 +171,9 @@ function StateList(props) {
     form.validateFieldsAndScroll((err, data) => {
       if (!err) {
         const postData = data;
-        postData.organizationId = orgId;
         setSubmitting(true);
         if (showType === 'create') {
-          stateStore.createState(orgId, postData)
+          statusApi.create(postData)
             .then((res) => {
               if (res && res.failed) {
                 // eslint-disable-next-line no-console
@@ -196,7 +192,7 @@ function StateList(props) {
               setSubmitting(false);
             });
         } else {
-          stateStore.updateState(orgId, editState.id, Object.assign(editState, postData))
+          statusApi.update(editState.id, Object.assign(editState, postData))
             .then((res) => {
               if (res && res.failed) {
                 Choerodon.prompt(res.message);
@@ -221,7 +217,6 @@ function StateList(props) {
       page: pagination.page, size: pagination.pageSize, sort: tableParam.sorter, param: tableParam.param,
     });
   };
-
 
   const tableChange = (newPagination, filters, sorter, param) => {
     const sort = {};
@@ -276,7 +271,7 @@ function StateList(props) {
     // const { type, editState } = this.state;
     if (showType === 'create' || value !== (editState && editState.name)) {
       setSubmitting(true);
-      const res = await stateStore.checkName(orgId, value);
+      const res = await statusApi.checkName(value);
       setSubmitting(false);
       if (res && res.statusExist) {
         callback(intl.formatMessage({ id: 'priority.create.name.error' }));
@@ -328,32 +323,11 @@ function StateList(props) {
     title: <FormattedMessage id="state.stage" />,
     dataIndex: 'type',
     key: 'type',
-    filters: stageList.filter(s => s.code !== 'none').map(s => ({ text: s.name, value: s.code })),
-    render: record => (
+    filters: stageList.filter((s) => s.code !== 'none').map((s) => ({ text: s.name, value: s.code })),
+    render: (record) => (
       <div>
-        <div className="issue-state-block" style={{ backgroundColor: stageMap[record].colour }} />
-        <span style={{ verticalAlign: 'middle' }}>{stageMap[record].name}</span>
-      </div>
-    ),
-  },
-  {
-    title: <FormattedMessage id="state.stateMachine" />,
-    dataIndex: 'stateMachine',
-    key: 'stateMachine',
-    render: (text, record) => (
-      <div>
-        {record.stateMachineInfoList && record.stateMachineInfoList.length
-          ? (
-            <a
-              role="none"
-              onClick={() => showStateMachines(record)}
-            >
-              {record.stateMachineInfoList.length}
-              个关联的状态机
-            </a>
-          )
-          : '-'
-        }
+        <div className="issue-state-block" style={{ backgroundColor: stageMap[record]?.colour }} />
+        <span style={{ verticalAlign: 'middle' }}>{stageMap[record]?.name}</span>
       </div>
     ),
   }]);
@@ -373,6 +347,7 @@ function StateList(props) {
     // const {
     //   statesList = [], initialTotal, total, type,
     // } = this.state;
+    const disabledEditName = editState && backlogStates.includes(editState.code);
     const { getFieldDecorator } = form;
     const formContent = (
       <div className="issue-region">
@@ -395,8 +370,18 @@ function StateList(props) {
                 autoFocus
                 label={<FormattedMessage id="state.name" />}
                 size="default"
+                disabled={disabledEditName}
                 maxLength={15}
               />,
+            )}
+            {disabledEditName && (
+            <span style={{
+              color: 'rgba(0,0,0,0.65)',
+              marginLeft: 2,
+            }}
+            >
+              状态被需求池使用，不可更改名称
+            </span>
             )}
           </FormItem>
           <FormItem
@@ -428,7 +413,7 @@ function StateList(props) {
                 dropdownMatchSelectWidth
                 size="default"
               >
-                {stageList.map(stage => (
+                {stageList.map((stage) => (
                   <Option
                     value={stage.code}
                     key={stage.code}
@@ -454,11 +439,8 @@ function StateList(props) {
 
     return (
       <Page service={[
-        'agile-service.status.queryStatusList',
-        'agile-service.status.create',
-        'agile-service.status.checkName',
-        'agile-service.status.delete',
-      ]} 
+        'choerodon.code.organization.setting.issue.states.ps.state',
+      ]}
       >
         <Header title={<FormattedMessage id="state.title" />}>
           {!initialTotal
@@ -473,8 +455,7 @@ function StateList(props) {
               <Button icon="playlist_add " onClick={() => showSideBar('create')}>
                 <FormattedMessage id="state.create" />
               </Button>
-            )
-          }
+            )}
         </Header>
         <Breadcrumb />
         <Content className="issue-state-content">
@@ -482,7 +463,7 @@ function StateList(props) {
             dataSource={statesList.list}
             columns={getColumn()}
             filterBarPlaceholder="过滤表"
-            rowKey={record => record.id}
+            rowKey={(record) => record.id}
             loading={stateStore.getIsLoading}
             pagination={pageInfo}
             onChange={tableChange}

@@ -18,12 +18,10 @@ import io.choerodon.agile.infra.mapper.IssueStatusMapper;
 import io.choerodon.agile.infra.utils.ConvertUtil;
 import io.choerodon.core.exception.CommonException;
 import org.modelmapper.ModelMapper;
-import org.modelmapper.convention.MatchingStrategies;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.PostConstruct;
 import java.util.List;
 import java.util.Map;
 
@@ -68,13 +66,8 @@ public class BoardColumnServiceImpl implements BoardColumnService {
     private IssueStatusService issueStatusService;
     @Autowired
     private ProjectConfigService projectConfigService;
-
-    private ModelMapper modelMapper = new ModelMapper();
-
-    @PostConstruct
-    public void init() {
-        modelMapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
-    }
+    @Autowired
+    private ModelMapper modelMapper;
 
     private void updateSequence(BoardColumnVO boardColumnVO) {
         List<BoardColumnDTO> boardColumnDTOList = boardColumnMapper.selectByBoardIdOrderBySequence(boardColumnVO.getBoardId());
@@ -215,6 +208,9 @@ public class BoardColumnServiceImpl implements BoardColumnService {
     @Override
     public void delete(Long projectId, Long columnId) {
         BoardColumnDTO boardColumnDTO = boardColumnMapper.selectByPrimaryKey(columnId);
+        if (!boardColumnDTO.getProjectId().equals(projectId)) {
+            throw new CommonException("error.project.id.illegal");
+        }
         BoardColumnValidator.checkDeleteColumn(boardColumnDTO);
         // 删除列
         if (boardColumnMapper.deleteByPrimaryKey(columnId) != 1) {
@@ -242,7 +238,10 @@ public class BoardColumnServiceImpl implements BoardColumnService {
 
     @Override
     public void deleteProgramBoardColumn(Long projectId, Long columnId) {
-        BoardColumnDTO boardColumnDTO = boardColumnMapper.selectByPrimaryKey(columnId);
+        BoardColumnDTO boardColumn = new BoardColumnDTO();
+        boardColumn.setProjectId(projectId);
+        boardColumn.setColumnId(columnId);
+        BoardColumnDTO boardColumnDTO = boardColumnMapper.selectOne(boardColumn);
         BoardColumnValidator.checkDeleteColumn(boardColumnDTO);
         // 删除列
         if (boardColumnMapper.deleteByPrimaryKey(columnId) != 1) {
@@ -263,7 +262,7 @@ public class BoardColumnServiceImpl implements BoardColumnService {
         return modelMapper.map(boardColumnMapper.selectOne(boardColumnDTO), BoardColumnVO.class);
     }
 
-    private void initColumnWithStatus(Long projectId, Long boardId, String name, String categoryCode, Long statusId, Integer sequence) {
+    protected void initColumnWithStatus(Long projectId, Long boardId, String name, String categoryCode, Long statusId, Integer sequence) {
         BoardColumnDTO column = new BoardColumnDTO();
         column.setBoardId(boardId);
         column.setName(name);
@@ -348,7 +347,7 @@ public class BoardColumnServiceImpl implements BoardColumnService {
             boardColumnMapper.updateColumnCategory(columnSortVO.getBoardId(), size);
             boardColumnMapper.updateColumnColor(columnSortVO.getBoardId(), size);
         } catch (Exception e) {
-            throw new CommonException(e.getMessage());
+            throw new CommonException("error.column.sort", e);
         }
     }
 
@@ -371,7 +370,7 @@ public class BoardColumnServiceImpl implements BoardColumnService {
                 throw new CommonException("error.BoardColumn.update");
             }
         } catch (Exception e) {
-            throw new CommonException(e.getMessage());
+            throw new CommonException("error.column.sort.by.program", e);
         }
     }
 
@@ -423,7 +422,7 @@ public class BoardColumnServiceImpl implements BoardColumnService {
         try {
             boardColumnMapper.updateMaxAndMinNum(columnWithMaxMinNumVO);
         } catch (Exception e) {
-            throw new CommonException(e.getMessage());
+            throw new CommonException("error.update.column.contraint", e);
         }
         return modelMapper.map(boardColumnMapper.selectByPrimaryKey(columnWithMaxMinNumVO.getColumnId()), BoardColumnVO.class);
     }

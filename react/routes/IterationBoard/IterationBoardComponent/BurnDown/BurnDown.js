@@ -1,20 +1,23 @@
+/* eslint-disable prefer-destructuring */
 import React, { Component } from 'react';
 import { withRouter } from 'react-router-dom';
 import ReactEcharts from 'echarts-for-react';
 import _ from 'lodash';
-import moment from 'moment';
+import Moment from 'moment';
+import { extendMoment } from 'moment-range';
 import {
   Dropdown, Icon, Menu, Spin, Checkbox,
 } from 'choerodon-ui';
-import { stores, axios } from '@choerodon/boot';
+import { stores } from '@choerodon/boot';
+import { sprintApi, reportApi } from '@/api';
 import EmptyBlockDashboard from '../../../../components/EmptyBlockDashboard';
 import pic from '../EmptyPics/no_sprint.svg';
 import lineLegend from './Line.svg';
 import './BurnDown.less';
 
-/* eslint-disable */
-const { AppState } = stores;
 
+const { AppState } = stores;
+const moment = extendMoment(Moment);
 class BurnDown extends Component {
   constructor(props) {
     super(props);
@@ -30,18 +33,16 @@ class BurnDown extends Component {
     };
   }
 
-  componentWillReceiveProps(nextProps) {
+  componentDidMount() {
     const { sprintId } = this.props;
-    if (nextProps.sprintId !== sprintId) {
-      const newSprintId = nextProps.sprintId;
-      const unit = this.getUnitFromLocalStorage();
-      this.setState({
-        unit,
-        sprintId: newSprintId,
-      });
-      this.loadSprints(newSprintId, unit);
-    }
+    const unit = this.getUnitFromLocalStorage();
+    this.setState({
+      unit,
+      sprintId,
+    });
+    this.loadSprints(sprintId, unit);
   }
+
 
   getUnitFromLocalStorage() {
     if (!window.localStorage) {
@@ -147,6 +148,7 @@ class BurnDown extends Component {
         },
         axisLabel: {
           show: true,
+          // eslint-disable-next-line radix
           interval: parseInt(xAxis.length / 7) ? parseInt(xAxis.length / 7) - 1 : 0,
           textStyle: {
             color: 'rgba(0, 0, 0, 0.65)',
@@ -246,42 +248,19 @@ class BurnDown extends Component {
   }
 
   getBetweenDateStr(start, end) {
-    const { restDayShow, restDays } = this.state;
-    const result = [];
-    const rest = [];
-    const beginDay = start.split('-');
-    const endDay = end.split('-');
-    const diffDay = new Date();
-    const dateList = [];
-    let i = 0;
-    diffDay.setDate(beginDay[2]);
-    diffDay.setMonth(beginDay[1] - 1);
-    diffDay.setFullYear(beginDay[0]);
-    while (i == 0) {
-      const countDay = diffDay.getTime();
-      if (restDays.includes(moment(diffDay).format('YYYY-MM-DD'))) {
-        rest.push(moment(diffDay).format('YYYY-MM-DD'));
-      }
-      dateList[2] = diffDay.getDate();
-      dateList[1] = diffDay.getMonth() + 1;
-      dateList[0] = diffDay.getFullYear();
-      if (String(dateList[1]).length == 1) { dateList[1] = `0${dateList[1]}`; }
-      if (String(dateList[2]).length === 1) { dateList[2] = `0${dateList[2]}`; }
-      if (restDayShow || !restDays.includes(moment(diffDay).format('YYYY-MM-DD'))) {
-        result.push(`${dateList[0]}-${dateList[1]}-${dateList[2]}`);
-      }
-      diffDay.setTime(countDay + 24 * 60 * 60 * 1000);
-      if (dateList[0] == endDay[0] && dateList[1] == endDay[1] && dateList[2] == endDay[2]) {
-        i = 1;
-      }
-    }
+    // 是否显示非工作日
+    const { restDays } = this.state;
+    const range = moment.range(start, end);
+    const days = Array.from(range.by('day'));
+    const result = days.map(day => day.format('YYYY-MM-DD'));
+    const rest = days.filter(day => restDays.includes(day.format('YYYY-MM-DD'))).map(day => day.format('YYYY-MM-DD'));
     return { result, rest };
   }
 
   loadSprints(sprintId, unit) {
     const projectId = AppState.currentMenuType.id;
     this.setState({ loading: true });
-    axios.post(`/agile/v1/projects/${projectId}/sprint/names`, ['started', 'closed'])
+    sprintApi.loadSprints(['started', 'closed'])
       .then((res) => {
         if (res && res.length) {
           const sprint = res.find(v => v.sprintId === sprintId);
@@ -294,12 +273,10 @@ class BurnDown extends Component {
   }
 
   getRestDays = (sprintId, unit) => {
-    const projectId = AppState.currentMenuType.id;
-    const orgId = AppState.currentMenuType.organizationId;
-    axios.get(`/agile/v1/projects/${projectId}/sprint/query_non_workdays/${sprintId}/${orgId}`).then((res) => {
+    sprintApi.getRestDays(sprintId).then((res) => {
       if (res) {
         this.setState({
-          restDays: res.map((date) => moment(date).format('YYYY-MM-DD')),
+          restDays: res.map(date => moment(date).format('YYYY-MM-DD')),
         }, () => {
           this.loadChartData(sprintId, unit);
         });
@@ -312,84 +289,83 @@ class BurnDown extends Component {
   };
 
   loadChartData(sprintId, unit = 'remainingEstimatedTime') {
-    axios.get(`/agile/v1/projects/${AppState.currentMenuType.id}/reports/${sprintId}/burn_down_report/coordinate?type=${unit}&ordinalType=asc`)
-      .then((res) => {
-        const dataDates = Object.keys(res.coordinate);
-        const [dataMinDate, dataMaxDate] = [dataDates[0], dataDates[dataDates.length - 1]];
-        const { sprint: { endDate } } = this.state;
-        const sprintMaxDate = endDate.split(' ')[0];
-        const maxDate = moment(dataMaxDate).isBefore(moment(sprintMaxDate))
-          ? sprintMaxDate : dataMaxDate;
-        let allDate;
-        let rest = [];
-        if (moment(maxDate).isBefore(sprintMaxDate)) {
-          const result = this.getBetweenDateStr(dataMinDate, sprintMaxDate);
-          allDate = result.result;
-          rest = result.rest;
-        } else if (moment(dataMinDate).isSame(maxDate)) {
-          allDate = [dataMinDate];
-        } else {
-          const result = this.getBetweenDateStr(dataMinDate, maxDate);
-          allDate = result.result;
-          rest = result.rest;
-        }
-        const xData = allDate;
-        let markAreaData = [];
-        let exportAxisData = [res.expectCount];
-        const { restDayShow } = this.state;
+    reportApi.loadBurnDownCoordinate(sprintId, unit).then((res) => {
+      const dataDates = Object.keys(res.coordinate);
+      const [dataMinDate, dataMaxDate] = [dataDates[0], dataDates[dataDates.length - 1]];
+      const { sprint: { endDate } } = this.state;
+      const sprintMaxDate = endDate.split(' ')[0];
+      const maxDate = moment(dataMaxDate).isBefore(moment(sprintMaxDate))
+        ? sprintMaxDate : dataMaxDate;
+      let allDate;
+      let rest = [];
+      if (moment(maxDate).isBefore(sprintMaxDate)) {
+        const result = this.getBetweenDateStr(dataMinDate, sprintMaxDate);
+        allDate = result.result;
+        rest = result.rest;
+      } else if (moment(dataMinDate).isSame(maxDate)) {
+        allDate = [dataMinDate];
+      } else {
+        const result = this.getBetweenDateStr(dataMinDate, maxDate);
+        allDate = result.result;
+        rest = result.rest;
+      }
+      const xData = allDate;
+      const markAreaData = [];
+      let exportAxisData = [res.expectCount];
+      const { restDayShow } = this.state;
 
-        // 如果展示非工作日，期望为一条连续斜线
-        if (!restDayShow) {
-          if (allDate.length) {
-            exportAxisData = [
-              ['', res.expectCount],
-              [allDate[allDate.length - 1].split(' ')[0].slice(5).replace('-', '/'), 0],
-            ];
+      // 如果展示非工作日，期望为一条连续斜线
+      if (!restDayShow) {
+        if (allDate.length) {
+          exportAxisData = [
+            ['', res.expectCount],
+            [allDate[allDate.length - 1].split(' ')[0].slice(5).replace('-', '/'), 0],
+          ];
+        }
+      }
+
+      // fix on 916, the crash of endless loop, when dataMinDate and maxDate is same.
+
+      // const xData = this.getBetweenDateStr(dataMinDate, maxDate);
+      const xDataFormat = _.map(xData, item => item.slice(5).replace('-', '/'));
+      const yAxis = xData.map((data, index) => {
+        // 显示非工作日，则非工作日期望为水平线
+        if (restDayShow) {
+          // 工作日天数
+          const countWorkDay = (allDate.length - rest.length) || 1;
+          // 日工作量
+          const dayAmount = res.expectCount / countWorkDay;
+          if (rest.includes(allDate[index])) {
+            // 非工作日
+            markAreaData.push([
+              {
+                xAxis: index === 0 ? '' : allDate[index - 1].split(' ')[0].slice(5).replace('-', '/'),
+              },
+              {
+                xAxis: allDate[index].split(' ')[0].slice(5).replace('-', '/'),
+              },
+            ]);
+            exportAxisData[index + 1] = exportAxisData[index];
+          } else {
+            // 工作量取整
+            exportAxisData[index + 1] = (exportAxisData[index] - dayAmount) < 0 ? 0 : exportAxisData[index] - dayAmount;
           }
         }
-
-        // fix on 916, the crash of endless loop, when dataMinDate and maxDate is same.
-
-        // const xData = this.getBetweenDateStr(dataMinDate, maxDate);
-        const xDataFormat = _.map(xData, item => item.slice(5).replace('-', '/'));
-        const yAxis = xData.map((data, index) => {
-          // 显示非工作日，则非工作日期望为水平线
-          if (restDayShow) {
-            // 工作日天数
-            const countWorkDay = (allDate.length - rest.length) || 1;
-            // 日工作量
-            const dayAmount = res.expectCount / countWorkDay;
-            if (rest.includes(allDate[index])) {
-              // 非工作日
-              markAreaData.push([
-                {
-                  xAxis: index === 0 ? '' : allDate[index - 1].split(' ')[0].slice(5).replace('-', '/'),
-                },
-                {
-                  xAxis: allDate[index].split(' ')[0].slice(5).replace('-', '/'),
-                }
-              ]);
-              exportAxisData[index + 1] = exportAxisData[index];
-            } else {
-              // 工作量取整
-              exportAxisData[index + 1] = (exportAxisData[index] - dayAmount) < 0 ? 0 : exportAxisData[index] - dayAmount;
-            }
-          }
-          if (dataDates.includes(data)) return res.coordinate[data];
-          if (moment(data).isAfter(moment())) return null;
-          res.coordinate[data] = res.coordinate[xData[index - 1]];
-          return res.coordinate[xData[index - 1]];
-        });
-        yAxis.unshift(res.expectCount);
-        this.setState({
-          expectCount: res.expectCount,
-          xAxis: ['', ...xDataFormat],
-          yAxis,
-          loading: false,
-          exportAxis: exportAxisData,
-          markAreaData,
-        });
+        if (dataDates.includes(data)) return res.coordinate[data];
+        if (moment(data).isAfter(moment())) return null;
+        res.coordinate[data] = res.coordinate[xData[index - 1]];
+        return res.coordinate[xData[index - 1]];
       });
+      yAxis.unshift(res.expectCount);
+      this.setState({
+        expectCount: res.expectCount,
+        xAxis: ['', ...xDataFormat],
+        yAxis,
+        loading: false,
+        exportAxis: exportAxisData,
+        markAreaData,
+      });
+    });
   }
 
   handleChangeUnit({ key }) {
@@ -450,7 +426,7 @@ class BurnDown extends Component {
         <div className="switch" style={{ display: !loading && !sprintId ? 'none' : 'block' }}>
           <Dropdown overlay={menu} trigger={['click']} getPopupContainer={triggerNode => triggerNode.parentNode}>
             <div className="c7n-dropdown-link c7n-agile-dashboard-burndown-select">
-              {'单位选择'}
+              单位选择
               <Icon type="arrow_drop_down" />
             </div>
           </Dropdown>
